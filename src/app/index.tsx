@@ -1,9 +1,9 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { deleteLinkToken } from '../store/secure';
-import type { Repo, ServerRow } from '../store/repo';
+import { AUTO_POINT_KEY, parseAutoPoint, type Repo, type ServerRow } from '../store/repo';
 import { getRepo } from '../store/sqlite';
 import { Button, Divider, layout, Screen, Txt } from '../ui/components';
 import { useTheme } from '../ui/theme';
@@ -18,6 +18,12 @@ export default function Home() {
   const [servers, setServers] = useState<ServerRow[]>([]);
   const [games, setGames] = useState<RecentGame[]>([]);
   const { mode, setMode } = useThemeMode();
+  const [autoPoint, setAutoPoint] = useState(true);
+  useEffect(() => {
+    void getRepo().then(async (r) =>
+      setAutoPoint(parseAutoPoint(await r.getSetting(AUTO_POINT_KEY))),
+    );
+  }, []);
 
   const load = useCallback(async () => {
     const repo = await getRepo();
@@ -119,6 +125,20 @@ export default function Home() {
             </View>
           ))}
         </View>
+
+        <Txt variant="heading">{t('settings.autoPoint')}</Txt>
+        <Txt variant="small" muted>
+          {t('settings.autoPoint.hint')}
+        </Txt>
+        <Button
+          label={autoPoint ? t('settings.on') : t('settings.off')}
+          kind={autoPoint ? 'primary' : 'secondary'}
+          onPress={async () => {
+            const next = !autoPoint;
+            setAutoPoint(next);
+            (await getRepo()).setSetting(AUTO_POINT_KEY, next ? 'on' : 'off');
+          }}
+        />
       </ScrollView>
     </Screen>
   );

@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { currentScore, timeoutsLeft, type GameEvent } from '../../../game/reducer';
 import type { Side } from '../../../game/types';
 import { GoalSheet, nameOf, numberOf, RosterEditor, TeamHalf, TeamPicker } from '../../../game/ui';
 import { useGame, type ActionError } from '../../../game/useGame';
-import { gameScope } from '../../../store/repo';
+import { AUTO_POINT_KEY, gameScope, parseAutoPoint } from '../../../store/repo';
+import { getRepo } from '../../../store/sqlite';
 import { isFullySynced, unsentRows } from '../../../sync/outbox';
 import { ActionButtons, ActionTimerBar, formatTime, GameClockPanel } from '../../../timekeeper/ui';
 import { useTemplates } from '../../../timekeeper/useTemplates';
@@ -34,7 +35,12 @@ export default function GameScreen() {
   const [more, setMore] = useState(false);
   const [confirmFinal, setConfirmFinal] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [autoPoint] = useState(true);
+  const [autoPoint, setAutoPoint] = useState(true);
+  useEffect(() => {
+    void getRepo().then(async (r) =>
+      setAutoPoint(parseAutoPoint(await r.getSetting(AUTO_POINT_KEY))),
+    );
+  }, []);
 
   if (!game.loaded || !game.session || !tk.ready) return <Screen />;
   const { state, context, outbox } = game.session;

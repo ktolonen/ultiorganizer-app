@@ -5,7 +5,7 @@ import { newOutbox } from '../sync/outbox';
 import { newSession, startClock } from '../timekeeper/engine';
 import { BUNDLED_TEMPLATES } from '../timekeeper/templates';
 import { type Db, MIGRATIONS, migrate } from './migrations';
-import { RETENTION_MS, STANDALONE_SCOPE, createRepo, gameScope } from './repo';
+import { RETENTION_MS, STANDALONE_SCOPE, createRepo, gameScope, parseAutoPoint } from './repo';
 
 /** Adapts node:sqlite (real SQL, in memory) to the app's Db interface. */
 function memoryDb(): Db {
@@ -255,5 +255,13 @@ describe('timekeeper and settings', () => {
     await repo.setSetting('theme', 'night');
     await repo.setSetting('theme', 'day');
     expect(await repo.getSetting('theme')).toBe('day');
+  });
+});
+
+describe('auto point setting', () => {
+  it('is on unless explicitly turned off', () => {
+    expect(parseAutoPoint(null)).toBe(true);
+    expect(parseAutoPoint('on')).toBe(true);
+    expect(parseAutoPoint('off')).toBe(false);
   });
 });

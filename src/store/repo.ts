@@ -289,6 +289,10 @@ export function createRepo(db: Db) {
 
 export type Repo = ReturnType<typeof createRepo>;
 
+/** The "Start of point after a goal" setting; on unless explicitly turned off. */
+export const AUTO_POINT_KEY = 'autoPoint';
+export const parseAutoPoint = (v: string | null): boolean => v !== 'off';
+
 type GameSql = {
   server_id: number;
   game_id: number;
