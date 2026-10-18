@@ -1,0 +1,47 @@
+import type { ConfigContext, ExpoConfig } from 'expo/config';
+
+// Cleartext http is allowed only in development builds (APP_VARIANT=development),
+// for a dev stack on the LAN or the Android emulator. Release builds are https only.
+const isDev = process.env.APP_VARIANT === 'development';
+
+export default ({ config }: ConfigContext): ExpoConfig => ({
+  ...config,
+  name: isDev ? 'Ultiorganizer Field (dev)' : 'Ultiorganizer Field',
+  slug: 'ultiorganizer-field',
+  version: '0.1.0',
+  orientation: 'default',
+  icon: './assets/images/icon.png',
+  // Not `ultiorganizer-app`: the setup QR is read by the in-app scanner only, and
+  // Android does not verify custom schemes, so another app could claim it.
+  scheme: 'ultiorganizer-field',
+  userInterfaceStyle: 'automatic',
+  ios: {
+    bundleIdentifier: isDev ? 'org.ultiorganizer.field.dev' : 'org.ultiorganizer.field',
+    supportsTablet: true,
+    infoPlist: {
+      NSCameraUsageDescription: 'The camera scans the scorekeeping and setup QR codes.',
+      ...(isDev ? { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } } : {}),
+    },
+  },
+  android: {
+    package: isDev ? 'org.ultiorganizer.field.dev' : 'org.ultiorganizer.field',
+    adaptiveIcon: {
+      backgroundColor: '#FFFFFF',
+      foregroundImage: './assets/images/android-icon-foreground.png',
+      backgroundImage: './assets/images/android-icon-background.png',
+      monochromeImage: './assets/images/android-icon-monochrome.png',
+    },
+    predictiveBackGestureEnabled: false,
+  },
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    'expo-sqlite',
+    'expo-localization',
+    ['expo-camera', { cameraPermission: 'The camera scans the scorekeeping and setup QR codes.' }],
+    ['expo-notifications', { enableBackgroundRemoteNotifications: false }],
+    ['expo-build-properties', { android: { usesCleartextTraffic: isDev } }],
+  ],
+  extra: { devHttp: isDev },
+  experiments: { reactCompiler: true },
+});

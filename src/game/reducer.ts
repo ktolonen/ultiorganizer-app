@@ -1,0 +1,369 @@
+import type { EligiblePlayer, EntryContext, GameResult, RosterEntry, Rules, Side } from './types';
+
+/**
+ * Pure game state over the event log. Every rule here mirrors what the server
+ * enforces (docs/api.md, "Scorekeeping app endpoints"), so an event the reducer
+ * accepts is one the server should accept, and an event it refuses never enters
+ * the outbox.
+ */
+
+export type Goal = {
+  num: number;
+  side: Side;
+  scorerId: number | null;
+  assistId: number | null;
+  callahan: boolean;
+  /** Seconds into the game; null when the event hides goal times. */
+  time: number | null;
+  homeScore: number;
+  awayScore: number;
+};
+
+export type Stoppage = { time: number };
+export type BySide<T> = Record<Side, T>;
+
+export type GameState = {
+  gameId: number;
+  teamIds: BySide<number | null>;
+  eligible: BySide<EligiblePlayer[]>;
+  rosters: BySide<RosterEntry[]>;
+  goals: Goal[];
+  timeouts: BySide<Stoppage[]>;
+  spiritStoppages: BySide<Stoppage[]>;
+  result: GameResult | null;
+  startingOffence: Side | null;
+  halftime: number | null;
+  official: string | null;
+  forfeit: boolean;
+  rules: Rules;
+  /** Player ids the defence sheet refers to; they must stay on a roster. */
+  retainedPlayerIds: number[];
+};
+
+export type GameEvent =
+  | {
+      type: 'goal';
+      side: Side;
+      scorerId: number | null;
+      assistId: number | null;
+      callahan: boolean;
+      time: number | null;
+    }
+  | { type: 'delete_last_goal'; num: number }
+  | { type: 'timeout'; side: Side; time: number }
+  | { type: 'spirit_stoppage'; side: Side; time: number }
+  /** Local correction of an older entry. The live API cannot delete these, so it syncs by full upload. */
+  | { type: 'remove_timeout'; side: Side; index: number }
+  | { type: 'remove_spirit_stoppage'; side: Side; index: number }
+  | { type: 'score_tap'; side: Side; delta: 1 | -1 }
+  | { type: 'roster'; side: Side; players: RosterEntry[] }
+  | {
+      type: 'metadata';
+      startingOffence?: Side | null;
+      halftime?: number | null;
+      official?: string | null;
+    }
+  | { type: 'finalize' };
+
+export type GameErrorCode =
+  | 'forfeit'
+  | 'game_final'
+  | 'goal_changed'
+  | 'timeout_limit'
+  | 'spirit_stoppage_limit'
+  | 'spirit_stoppages_disabled'
+  | 'score_out_of_range'
+  | 'score_changed'
+  | 'player_referenced'
+  | 'validation_failed';
+
+export type GameError = { code: GameErrorCode; path?: string; message: string };
+export type Reduced = { ok: true; state: GameState } | { ok: false; error: GameError };
+
+export const MAX_SPIRIT_STOPPAGES_PER_TEAM = 4;
+export const MAX_GOAL_TIME = 32767;
+export const MAX_STOPPAGE_TIME = 86400;
+export const MAX_ROSTER = 100;
+export const MAX_OFFICIAL_LENGTH = 50;
+
+const other = (side: Side): Side => (side === 'home' ? 'away' : 'home');
+const fail = (code: GameErrorCode, message: string, path?: string): Reduced => ({
+  ok: false,
+  error: { code, message, path },
+});
+const ok = (state: GameState): Reduced => ({ ok: true, state });
+const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n);
+
+export function fromEntryContext(ctx: EntryContext): GameState {
+  return {
+    gameId: ctx.game.game_id,
+    teamIds: { home: ctx.home.team_id, away: ctx.away.team_id },
+    eligible: { home: ctx.home.eligible_players, away: ctx.away.eligible_players },
+    rosters: { home: ctx.home.roster, away: ctx.away.roster },
+    goals: ctx.goals.map((g) => ({
+      num: g.num,
+      side: g.side,
+      scorerId: g.scorer_id,
+      assistId: g.assist_id,
+      callahan: g.callahan,
+      time: g.time,
+      homeScore: g.home_score,
+      awayScore: g.away_score,
+    })),
+    timeouts: ctx.timeouts,
+    spiritStoppages: ctx.spirit_stoppages,
+    result: ctx.result,
+    startingOffence: ctx.metadata.starting_offence,
+    halftime: ctx.metadata.halftime,
+    official: ctx.metadata.official,
+    forfeit: ctx.retained.forfeit !== 'none',
+    rules: ctx.rules,
+    retainedPlayerIds: ctx.retained.defenses.referenced_player_ids,
+  };
+}
+
+/** Score the goal list adds up to. */
+export function goalTotals(goals: readonly Goal[]): { home: number; away: number } {
+  const last = goals[goals.length - 1];
+  return last ? { home: last.homeScore, away: last.awayScore } : { home: 0, away: 0 };
+}
+
+/** The score to show: the stored result when there is one, else the goal total. */
+export function currentScore(state: GameState): { home: number; away: number } {
+  return state.result
+    ? { home: state.result.home, away: state.result.away }
+    : goalTotals(state.goals);
+}
+
+export function timeoutsLeft(state: GameState, side: Side): number {
+  return Math.max(0, state.rules.timeouts_per_team - state.timeouts[side].length);
+}
+
+function onRoster(state: GameState, side: Side, playerId: number): boolean {
+  return state.rosters[side].some((p) => p.player_id === playerId);
+}
+
+function reduceGoal(state: GameState, e: Extract<GameEvent, { type: 'goal' }>): Reduced {
+  if (state.result?.state === 'final') return fail('game_final', 'The game is final.');
+  const { rules } = state;
+  const sideGoals = state.goals.filter((g) => g.side === e.side).length;
+  if (sideGoals >= rules.max_goals_per_side) {
+    return fail('validation_failed', 'Too many goals for one side.', 'side');
+  }
+  if (e.callahan && e.assistId !== null) {
+    return fail('validation_failed', 'A Callahan goal has no assist.', 'assist_id');
+  }
+  if (e.scorerId !== null && e.scorerId === e.assistId) {
+    return fail('validation_failed', 'Scorer and assist must differ.', 'assist_id');
+  }
+  if (e.scorerId !== null && !onRoster(state, e.side, e.scorerId)) {
+    return fail('validation_failed', 'The scorer is not on the roster.', 'scorer_id');
+  }
+  if (e.assistId !== null && !onRoster(state, e.side, e.assistId)) {
+    return fail('validation_failed', 'The assist is not on the roster.', 'assist_id');
+  }
+  const last = state.goals[state.goals.length - 1];
+  if (rules.hide_time_on_scoresheet) {
+    if (e.time !== null) {
+      return fail('validation_failed', 'Goal times are hidden in this event.', 'time');
+    }
+  } else {
+    if (!isInt(e.time) || e.time < 0 || e.time > MAX_GOAL_TIME) {
+      return fail('validation_failed', 'A goal time from 0 to 32767 is required.', 'time');
+    }
+    if (last?.time != null && e.time < last.time) {
+      return fail('validation_failed', 'Goal times must not go backwards.', 'time');
+    }
+  }
+  const home = last?.homeScore ?? 0;
+  const away = last?.awayScore ?? 0;
+  const goal: Goal = {
+    num: (last?.num ?? 0) + 1,
+    side: e.side,
+    scorerId: e.scorerId,
+    assistId: e.callahan ? null : e.assistId,
+    callahan: e.callahan,
+    time: e.time,
+    homeScore: home + (e.side === 'home' ? 1 : 0),
+    awayScore: away + (e.side === 'away' ? 1 : 0),
+  };
+  // Like the server: raise the result to the new score unless a stored score is already higher.
+  const prev = state.result;
+  const result: GameResult = {
+    home: Math.max(prev?.home ?? 0, goal.homeScore),
+    away: Math.max(prev?.away ?? 0, goal.awayScore),
+    state: 'ongoing',
+  };
+  return ok({ ...state, goals: [...state.goals, goal], result });
+}
+
+function reduceDeleteLast(
+  state: GameState,
+  e: Extract<GameEvent, { type: 'delete_last_goal' }>,
+): Reduced {
+  if (state.result?.state === 'final') return fail('game_final', 'The game is final.');
+  const last = state.goals[state.goals.length - 1];
+  if (!last || last.num !== e.num) {
+    return fail('goal_changed', 'Only the last goal can be deleted.', 'num');
+  }
+  const goals = state.goals.slice(0, -1);
+  // Lower the result only when it was tracking the goals.
+  const tracking =
+    state.result && state.result.home === last.homeScore && state.result.away === last.awayScore;
+  const totals = goalTotals(goals);
+  const result: GameResult | null = tracking ? { ...state.result!, ...totals } : state.result;
+  return ok({ ...state, goals, result });
+}
+
+function reduceStoppage(
+  state: GameState,
+  e: Extract<GameEvent, { type: 'timeout' | 'spirit_stoppage' }>,
+): Reduced {
+  if (!isInt(e.time) || e.time < 0 || e.time > MAX_STOPPAGE_TIME) {
+    return fail('validation_failed', 'A time from 0 to 86400 is required.', 'time');
+  }
+  if (e.type === 'timeout') {
+    if (state.timeouts[e.side].length >= state.rules.timeouts_per_team) {
+      return fail('timeout_limit', 'No timeouts left.', 'side');
+    }
+    return ok({
+      ...state,
+      timeouts: { ...state.timeouts, [e.side]: [...state.timeouts[e.side], { time: e.time }] },
+    });
+  }
+  if (!state.rules.spirit_stoppages_enabled) {
+    return fail('spirit_stoppages_disabled', 'Spirit stoppages are not used in this event.');
+  }
+  if (state.spiritStoppages[e.side].length >= MAX_SPIRIT_STOPPAGES_PER_TEAM) {
+    return fail('spirit_stoppage_limit', 'No spirit stoppages left.', 'side');
+  }
+  return ok({
+    ...state,
+    spiritStoppages: {
+      ...state.spiritStoppages,
+      [e.side]: [...state.spiritStoppages[e.side], { time: e.time }],
+    },
+  });
+}
+
+function reduceScoreTap(state: GameState, e: Extract<GameEvent, { type: 'score_tap' }>): Reduced {
+  if (state.result?.state === 'final') return fail('game_final', 'The game is final.');
+  const base = state.result ?? { home: 0, away: 0, state: 'ongoing' as const };
+  const next = { ...base, [e.side]: base[e.side] + e.delta };
+  if (next[e.side] < 0 || next[e.side] > state.rules.max_game_score) {
+    return fail('score_out_of_range', 'The score is out of range.');
+  }
+  // A game back at 0-0 before it started returns to "not started".
+  const result = next.home === 0 && next.away === 0 && state.goals.length === 0 ? null : next;
+  return ok({ ...state, result });
+}
+
+function reduceRoster(state: GameState, e: Extract<GameEvent, { type: 'roster' }>): Reduced {
+  if (state.result?.state === 'final') return fail('game_final', 'The game is final.');
+  if (e.players.length > MAX_ROSTER) {
+    return fail('validation_failed', 'Too many players.', 'players');
+  }
+  const seen = new Set<number>();
+  const eligible = new Map(state.eligible[e.side].map((p) => [p.player_id, p]));
+  for (const [i, p] of e.players.entries()) {
+    const path = `players[${i}]`;
+    if (seen.has(p.player_id)) return fail('validation_failed', 'Duplicate player.', path);
+    seen.add(p.player_id);
+    const known = eligible.get(p.player_id);
+    if (!known) return fail('validation_failed', 'Not a player of this team.', path);
+    if (state.rules.require_accreditation && known.accredited === false) {
+      return fail('validation_failed', 'The player is not accredited.', path);
+    }
+    if (
+      p.number !== null &&
+      (!isInt(p.number) || p.number < 0 || p.number > state.rules.max_jersey_number)
+    ) {
+      return fail('validation_failed', 'Jersey number out of range.', `${path}.number`);
+    }
+  }
+  const referenced = state.goals
+    .filter((g) => g.side === e.side)
+    .flatMap((g) => [g.scorerId, g.assistId])
+    .concat(state.retainedPlayerIds.filter((id) => onRoster(state, e.side, id)))
+    .filter((id): id is number => id !== null && !seen.has(id));
+  if (referenced.length) {
+    return fail(
+      'player_referenced',
+      `A goal or the defence sheet refers to player ${referenced[0]}.`,
+      'players',
+    );
+  }
+  return ok({ ...state, rosters: { ...state.rosters, [e.side]: e.players } });
+}
+
+function reduceMetadata(state: GameState, e: Extract<GameEvent, { type: 'metadata' }>): Reduced {
+  if ('halftime' in e && e.halftime != null) {
+    if (!isInt(e.halftime) || e.halftime < 0 || e.halftime > MAX_STOPPAGE_TIME) {
+      return fail('validation_failed', 'Halftime must be 0 to 86400.', 'halftime');
+    }
+  }
+  if ('official' in e && e.official != null && e.official.length > MAX_OFFICIAL_LENGTH) {
+    return fail('validation_failed', 'The name is too long.', 'official');
+  }
+  const next = { ...state };
+  if ('startingOffence' in e) next.startingOffence = e.startingOffence ?? null;
+  // Like the server, a halftime of 0 and an empty name count as unset.
+  if ('halftime' in e) next.halftime = e.halftime ? e.halftime : null;
+  if ('official' in e) next.official = e.official ? e.official : null;
+  return ok(next);
+}
+
+function reduceFinalize(state: GameState): Reduced {
+  if (!state.result) return fail('validation_failed', 'A game with no score cannot be finalized.');
+  if (state.result.state === 'final') return fail('game_final', 'The game is final.');
+  return ok({ ...state, result: { ...state.result, state: 'final' } });
+}
+
+export function reduce(state: GameState, event: GameEvent): Reduced {
+  if (state.forfeit) return fail('forfeit', 'The game is a forfeit.');
+  switch (event.type) {
+    case 'goal':
+      return reduceGoal(state, event);
+    case 'delete_last_goal':
+      return reduceDeleteLast(state, event);
+    case 'timeout':
+    case 'spirit_stoppage':
+      return reduceStoppage(state, event);
+    case 'remove_timeout':
+    case 'remove_spirit_stoppage': {
+      const key = event.type === 'remove_timeout' ? 'timeouts' : 'spiritStoppages';
+      const list = state[key][event.side];
+      if (!isInt(event.index) || event.index < 0 || event.index >= list.length) {
+        return fail('validation_failed', 'No such entry.', 'index');
+      }
+      return ok({
+        ...state,
+        [key]: { ...state[key], [event.side]: list.filter((_, i) => i !== event.index) },
+      });
+    }
+    case 'score_tap':
+      return reduceScoreTap(state, event);
+    case 'roster':
+      return reduceRoster(state, event);
+    case 'metadata':
+      return reduceMetadata(state, event);
+    case 'finalize':
+      return reduceFinalize(state);
+  }
+}
+
+/** Replays events over a base state, stopping at the first refused one. */
+export function replay(
+  base: GameState,
+  events: readonly GameEvent[],
+): { state: GameState; failedAt: number | null; error?: GameError } {
+  let state = base;
+  for (const [i, event] of events.entries()) {
+    const r = reduce(state, event);
+    if (!r.ok) return { state, failedAt: i, error: r.error };
+    state = r.state;
+  }
+  return { state, failedAt: null };
+}
+
+export { other as otherSide };

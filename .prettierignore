@@ -1,0 +1,5 @@
+node_modules
+.expo
+src/api/schema.d.ts
+api/openapi.json
+PLAN.md

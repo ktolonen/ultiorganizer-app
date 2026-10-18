@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # .npmrc sets legacy-peer-deps: openapi-typescript declares a TypeScript 5 peer; the SDK ships 6.
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- --ci
+      - name: Generated API types are current
+        run: |
+          npm run api:types
+          git diff --exit-code src/api/schema.d.ts
+      - name: Bundle (Android and iOS)
+        run: |
+          CI=1 npx expo export --platform android --output-dir "$RUNNER_TEMP/android"
+          CI=1 npx expo export --platform ios --output-dir "$RUNNER_TEMP/ios"
