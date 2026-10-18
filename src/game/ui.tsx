@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Button, Txt } from '../ui/components';
 import { useTheme } from '../ui/theme';
-import { FONTS, SIZE, SPACE, TARGET, readableOn } from '../ui/tokens';
+import { FONTS, SIZE, SPACE, TARGET, TEAM_SWATCHES, readableOn } from '../ui/tokens';
 import { back, initialPicker, pick, stepOf, toggleCallahan } from './goalPicker';
 import type { GameState } from './reducer';
 import type { RosterEntry, Side } from './types';
@@ -386,3 +386,53 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE.sm,
   },
 });
+
+/** A row of swatches per team; a colour already used by the other team is not offered. */
+export function ColorPicker({
+  names,
+  colors,
+  onChange,
+}: {
+  names: Record<Side, string>;
+  colors: Record<Side, string>;
+  onChange: (colors: Record<Side, string>) => void;
+}) {
+  const { palette } = useTheme();
+  return (
+    <View style={{ gap: SPACE.md }}>
+      {(['home', 'away'] as const).map((side) => {
+        const other = colors[side === 'home' ? 'away' : 'home'];
+        return (
+          <View key={side} style={{ gap: SPACE.xs }}>
+            <Txt variant="heading">{names[side]}</Txt>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm }}>
+              {TEAM_SWATCHES.map((c) => {
+                const selected = colors[side] === c;
+                const taken = c === other;
+                return (
+                  <Pressable
+                    key={c}
+                    accessibilityRole="button"
+                    accessibilityLabel={c}
+                    accessibilityState={{ selected, disabled: taken }}
+                    disabled={taken}
+                    onPress={() => onChange({ ...colors, [side]: c })}
+                    style={{
+                      width: TARGET.min,
+                      height: TARGET.min,
+                      borderRadius: TARGET.min / 2,
+                      backgroundColor: c,
+                      borderWidth: selected ? 4 : 1,
+                      borderColor: selected ? palette.ink : palette.line,
+                      opacity: taken ? 0.25 : 1,
+                    }}
+                  />
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}

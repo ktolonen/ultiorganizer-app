@@ -29,7 +29,7 @@ Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18).
 
 - **Server work S0–S2** (setup QR, `GET timekeeper/templates`, caps writes) lives in `../ultiorganizer` and was not touched. The app already degrades without them: paste-token pairing, a 404 on templates falls back to bundled defaults (probed once, cached), caps stay local. "Record cap" is not built (needs S2).
 - **Maestro flows, EAS builds, store assets and submission, a beta at a real tournament**: need devices, accounts and an event.
-- A team-colour picker (colours are chosen automatically per game from the 12 swatches) and a way to start a game offline-only.
+- A way to start a game offline-only.
 - Landscape layout, screenshots in Day/Night × phone/tablet × en/fi/de, an accessibility pass with VoiceOver/TalkBack, reviewed translations, Sentry (opt-in).
 - Contract tests against the dev stack (`docs/dev/compose.yaml`).
 - Goal times use the game clock rounded to the second; the web Scorekeeper's exact rounding rule was not checked beyond `roundedTime()`.

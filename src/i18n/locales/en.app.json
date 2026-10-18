@@ -107,6 +107,7 @@
   "error.event_readonly": "This event is read-only.",
   "error.invalid_scorekeeping_token": "The scorekeeping link is no longer valid.",
   "error.unknown": "Something went wrong ({{code}}).",
+  "game.colors": "Team colours",
   "game.tab.live": "Live",
   "game.tab.sheet": "Sheet",
   "game.tab.rosters": "Rosters",

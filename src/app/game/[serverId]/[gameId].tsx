@@ -4,7 +4,15 @@ import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { currentScore, timeoutsLeft, type GameEvent } from '../../../game/reducer';
 import type { Side } from '../../../game/types';
-import { GoalSheet, nameOf, numberOf, RosterEditor, TeamHalf, TeamPicker } from '../../../game/ui';
+import {
+  ColorPicker,
+  GoalSheet,
+  nameOf,
+  numberOf,
+  RosterEditor,
+  TeamHalf,
+  TeamPicker,
+} from '../../../game/ui';
 import { useGame, type ActionError } from '../../../game/useGame';
 import { AUTO_POINT_KEY, gameScope, parseAutoPoint } from '../../../store/repo';
 import { getRepo } from '../../../store/sqlite';
@@ -279,6 +287,9 @@ export default function GameScreen() {
               )}
             </View>
           ))}
+          <Divider />
+          <Txt variant="heading">{t('game.colors')}</Txt>
+          <ColorPicker names={names} colors={game.colors} onChange={game.setColors} />
           <Divider />
           <Txt muted>
             {t('term.startingOffence')}:{' '}
