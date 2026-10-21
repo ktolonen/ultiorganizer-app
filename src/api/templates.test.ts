@@ -6,7 +6,7 @@ import { WFDF_TEMPLATE } from '../timekeeper/templates';
 import { fetchTemplates, parseTemplates } from './templates';
 
 const creds = { root: 'https://a.org', appToken: 't' };
-const body = (templates: unknown) => ({ data: { defaultTemplateId: 1, templates } });
+const body = (templates: unknown) => ({ data: { default_template_id: 1, templates } });
 const wire = {
   id: 1,
   name: 'WFDF',

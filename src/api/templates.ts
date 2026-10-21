@@ -5,9 +5,9 @@ import { probeFromStatus, type ProbeResult } from './client';
 import { apiUrl, headersFor, type Credentials, type FetchLike } from './http';
 
 /**
- * `GET /api/v1/timekeeper/templates` (server Phase S1; not in API v1 yet). The data
- * is `TimekeeperTemplatesForClient()`: templates keyed by id, each with caps and
- * signal rows per action, texts translated by `Accept-Language`.
+ * `GET /api/v1/timekeeper/templates` (server Phase S1). The data is
+ * `TimekeeperTemplatesForClient()`: a list of templates, each with caps and signal
+ * rows per action, texts translated by `Accept-Language`.
  */
 const signalRow = z.object({ id: z.number().int(), time: z.number(), text: z.string() });
 const template = z.object({
@@ -18,7 +18,7 @@ const template = z.object({
 });
 const response = z.object({
   data: z.object({
-    defaultTemplateId: z.number().int(),
+    default_template_id: z.number().int(),
     templates: z.union([z.record(z.string(), template), z.array(template)]),
   }),
 });
@@ -26,7 +26,7 @@ const response = z.object({
 export function parseTemplates(json: unknown): TemplateSet | null {
   const parsed = response.safeParse(json);
   if (!parsed.success) return null;
-  const { defaultTemplateId, templates } = parsed.data.data;
+  const { default_template_id: defaultTemplateId, templates } = parsed.data.data;
   const list = (Array.isArray(templates) ? templates : Object.values(templates)).map(
     (t): TimekeeperTemplate => {
       // Keep only the known action groups; unknown ones from a newer server are ignored.
