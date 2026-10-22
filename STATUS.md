@@ -22,12 +22,12 @@ Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18).
 - Score taps are used only while neither side has a roster (result-only keeping). Once a roster exists every point is a goal; a side without a roster records an Unknown/Unknown goal, so taps and goals never mix and a whole-game upload stays possible.
 - Timekeeper sessions are scoped: one clock for Timekeeper-only mode and one per game. The template choice and local edits are shared per device.
 - A 2xx answer that is not a write answer (captive portal) is retried with the same key, never marked sent.
-- Server signal texts are database translations (`uo_translation`), not in the `.po` files, so fi/de/es signal texts fall back to English until S1 serves them translated.
+- Server signal texts are database translations (`uo_translation`), not in the `.po` files, the app sends `Accept-Language` to the S1 templates route, so fi/de/es signal texts come from the server when it is new enough, and fall back to bundled English otherwise.
 - Day `signal-warn` (`#E8A200`) is 2.2:1 on white. It is used only as a fill with text on it (9.6:1), never as a line or icon; a test records this.
 
 ## Not done
 
-- **Server work S0–S2** (setup QR, `GET timekeeper/templates`, caps writes) lives in `../ultiorganizer` and was not touched. The app already degrades without them: paste-token pairing, a 404 on templates falls back to bundled defaults (probed once, cached), caps stay local. "Record cap" is not built (needs S2).
+- **Server work S0–S2** is done in `../ultiorganizer` (setup QR, `GET timekeeper/templates`, caps writes). `api/openapi.json` and the generated types are synced to it. The app still works against servers without them: paste-token pairing, a 404 on templates falls back to bundled defaults (probed once, cached). "Record cap" is not built yet, so caps set on the phone stay local and do not reach the server.
 - **Maestro flows, EAS builds, store assets and submission, a beta at a real tournament**: need devices, accounts and an event.
 - A way to start a game offline-only. Needs a design decision first: without a server there is no entry context (teams, rules, game id), so it would be a device-local game with typed team names that can never be uploaded. The existing `offlineOnly` outbox flag covers only a real game that falls behind.
 - Landscape layout, screenshots in Day/Night × phone/tablet × en/fi/de, an accessibility pass with VoiceOver/TalkBack, reviewed translations, Sentry (opt-in).

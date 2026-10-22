@@ -98,6 +98,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/timekeeper/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the Timekeeper templates
+         * @description The Timekeeper templates with their caps and signals, as the public timekeeper/ page uses them. Template names and signal texts are translated into the configured locale that best matches Accept-Language (the default locale when none matches); Content-Language names it. Any valid token works, user-scoped ones included.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Preferred languages, for example fi-FI, fi;q=0.9. */
+                    "Accept-Language"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Templates */
+                200: {
+                    headers: {
+                        /** @description The locale of the texts, for example fi-FI. */
+                        "Content-Language"?: string;
+                        /** @description Accept-Language. */
+                        Vary?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "status": "ok",
+                         *       "data": {
+                         *         "default_template_id": 1,
+                         *         "templates": [
+                         *           {
+                         *             "id": 1,
+                         *             "name": "WFDF",
+                         *             "caps": {
+                         *               "half_time_cap": 55,
+                         *               "time_cap": 100
+                         *             },
+                         *             "signals": {
+                         *               "betweenpoints": [
+                         *                 {
+                         *                   "id": 1,
+                         *                   "time": 45,
+                         *                   "text": "Offence warning"
+                         *                 },
+                         *                 {
+                         *                   "id": 2,
+                         *                   "time": 60,
+                         *                   "text": "Defence warning"
+                         *                 },
+                         *                 {
+                         *                   "id": 3,
+                         *                   "time": 75,
+                         *                   "text": "Play"
+                         *                 }
+                         *               ],
+                         *               "timeout": [],
+                         *               "timeoutbeforepull": [],
+                         *               "halftime": [],
+                         *               "halfstart": [],
+                         *               "dispute": [],
+                         *               "discretrieval": []
+                         *             }
+                         *           }
+                         *         ]
+                         *       }
+                         *     }
+                         */
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "ok";
+                            data: {
+                                /** @description The template to preselect; 0 when there are none. */
+                                default_template_id: number;
+                                templates: components["schemas"]["TimekeeperTemplate"][];
+                            };
+                        };
+                    };
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Wrong method */
+                405: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit exceeded */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams": {
         parameters: {
             query?: never;
@@ -1820,6 +1944,311 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/v1/games/{game_id}/caps/{type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set a halftime cap or time cap
+         * @description Records the cap, or corrects the recorded one, as the Scorekeeper cap page does. A new cap needs a point cap above the higher score (409 point_cap_too_low); correcting a recorded cap allows any point cap from 1. A final game can take a cap. Refused while the event hides times (409 times_hidden). Cap events are not part of the token, so the token does not move. Entry context lists caps under retained.cap_events.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Client-chosen key, 1 to 64 printable ASCII characters. Resend the same key after a network error. */
+                    "Idempotency-Key": string;
+                    /** @description Scorekeeping link token from the QR code. */
+                    "X-Scorekeeping-Token": string;
+                };
+                path: {
+                    game_id: number;
+                    type: "half_cap" | "time_cap";
+                };
+                cookie?: never;
+            };
+            /** @description Content-Type application/json. */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["Cap"];
+                };
+            };
+            responses: {
+                /** @description Set or replayed */
+                200: {
+                    headers: {
+                        /** @description The resulting token, quoted. */
+                        ETag?: string;
+                        /** @description Present on a replay. */
+                        "Idempotent-Replay"?: "true";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "status": "ok",
+                         *       "data": {
+                         *         "game_id": 1,
+                         *         "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                         *         "result": {
+                         *           "home": 7,
+                         *           "away": 5,
+                         *           "state": "ongoing"
+                         *         },
+                         *         "cap": {
+                         *           "type": "half_cap",
+                         *           "time": 1500,
+                         *           "point_cap": 8
+                         *         }
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["WriteResult"];
+                    };
+                };
+                /** @description Invalid body (invalid_body or validation_failed with field paths), missing or malformed Idempotency-Key, invalid JSON */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing or invalid app token or scorekeeping link */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Game not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Wrong method; the Allow header names PUT and DELETE */
+                405: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description idempotency_conflict, forfeit, times_hidden, or point_cap_too_low */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Body larger than 256 KiB */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Content-Type is not application/json */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit exceeded */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unexpected failure; nothing was saved */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Event under maintenance, or busy after two retries (Retry-After) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Remove a halftime cap or time cap
+         * @description Removes the cap; removing an absent cap succeeds and changes nothing. Refused while the event hides times (409 times_hidden). Sends no body. The answer has cap null.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Client-chosen key, 1 to 64 printable ASCII characters. Resend the same key after a network error. */
+                    "Idempotency-Key": string;
+                    /** @description Scorekeeping link token from the QR code. */
+                    "X-Scorekeeping-Token": string;
+                };
+                path: {
+                    game_id: number;
+                    type: "half_cap" | "time_cap";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed, already absent, or replayed */
+                200: {
+                    headers: {
+                        /** @description The resulting token, quoted. */
+                        ETag?: string;
+                        /** @description Present on a replay. */
+                        "Idempotent-Replay"?: "true";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "status": "ok",
+                         *       "data": {
+                         *         "game_id": 1,
+                         *         "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                         *         "result": {
+                         *           "home": 7,
+                         *           "away": 5,
+                         *           "state": "ongoing"
+                         *         },
+                         *         "cap": null
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["WriteResult"];
+                    };
+                };
+                /** @description Missing or malformed Idempotency-Key */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing or invalid app token or scorekeeping link */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Game not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Wrong method; the Allow header names PUT and DELETE */
+                405: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description idempotency_conflict, forfeit, times_hidden */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit exceeded */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unexpected failure; nothing was saved */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Event under maintenance, or busy after two retries (Retry-After) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/finalize": {
         parameters: {
             query?: never;
@@ -2103,6 +2532,67 @@ export interface components {
             } & {
                 [key: string]: unknown;
             };
+        };
+        TimekeeperTemplate: {
+            id: number;
+            name: string;
+            caps: {
+                /** @description Minutes from the start of the game. */
+                half_time_cap: number;
+                /** @description Minutes from the start of the game. */
+                time_cap: number;
+            };
+            /** @description Signal rows per action, ordered by time. Every action key is present; an action without signals has an empty list. */
+            signals: {
+                betweenpoints: {
+                    id: number;
+                    /** @description Seconds from the start of the action. */
+                    time: number;
+                    text: string;
+                }[];
+                timeout: {
+                    id: number;
+                    /** @description Seconds from the start of the action. */
+                    time: number;
+                    text: string;
+                }[];
+                timeoutbeforepull: {
+                    id: number;
+                    /** @description Seconds from the start of the action. */
+                    time: number;
+                    text: string;
+                }[];
+                halftime: {
+                    id: number;
+                    /** @description Seconds from the start of the action. */
+                    time: number;
+                    text: string;
+                }[];
+                halfstart: {
+                    id: number;
+                    /** @description Seconds from the start of the action. */
+                    time: number;
+                    text: string;
+                }[];
+                dispute: {
+                    id: number;
+                    /** @description Seconds from the start of the action. */
+                    time: number;
+                    text: string;
+                }[];
+                discretrieval: {
+                    id: number;
+                    /** @description Seconds from the start of the action. */
+                    time: number;
+                    text: string;
+                }[];
+            };
+        };
+        Cap: {
+            /** @description Seconds of game time when the cap was called. */
+            time: number;
+            /** @description The new point cap. A new cap must exceed the higher score; a correction of a recorded cap may be any value from 1. */
+            point_cap: number;
         };
     };
     responses: never;
