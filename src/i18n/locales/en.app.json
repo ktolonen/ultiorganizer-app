@@ -54,7 +54,6 @@
   "timekeeper.capTime": "Time cap reached",
   "timekeeper.dismiss": "Dismiss",
   "timekeeper.sound": "Sound",
-  "timekeeper.more": "More",
   "timekeeper.template": "Time limits",
   "timekeeper.notifications": "Signals continue in the background when notifications are allowed.",
   "timekeeper.notification.title": "{{action}}",

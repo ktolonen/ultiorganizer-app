@@ -24,7 +24,7 @@ export const ACTION_ORDER: readonly ActionId[] = [
 ];
 
 /** The action timer bar: fills the width and changes colour at each signal (go, warn, stop). */
-export function ActionTimerBar({ tk }: { tk: TimekeeperApi }) {
+export function ActionTimerBar({ tk, compact }: { tk: TimekeeperApi; compact?: boolean }) {
   const { t } = useTranslation();
   const { palette } = useTheme();
   const view = tk.view;
@@ -36,6 +36,8 @@ export function ActionTimerBar({ tk }: { tk: TimekeeperApi }) {
         ? palette.signalWarn
         : palette.signalGo;
   const ink = view ? readableOn(fill) : palette.ink;
+  // The game screen uses a smaller timer so the action buttons fit without scrolling.
+  const timerSize = compact ? SIZE.xl : SIZE.score;
   const paused = tk.session.timer?.pausedAtMs != null;
   const scenarioId = tk.session.timer?.scenario.id;
   const label = view
@@ -46,17 +48,24 @@ export function ActionTimerBar({ tk }: { tk: TimekeeperApi }) {
       accessible
       accessibilityRole="timer"
       accessibilityLabel={label}
-      style={[styles.bar, { backgroundColor: fill, borderColor: palette.ink }]}
+      style={[
+        styles.bar,
+        compact && styles.barCompact,
+        { backgroundColor: fill, borderColor: palette.ink },
+      ]}
     >
       <Txt variant="small" style={{ color: ink }}>
         {view ? t(`timekeeper.action.${scenarioId}`) : t('timekeeper.noTimer')}
         {paused ? ' · ⏸' : ''}
       </Txt>
-      <Txt variant="figure" style={{ color: ink, fontSize: SIZE.score, lineHeight: SIZE.score }}>
+      <Txt variant="figure" style={{ color: ink, fontSize: timerSize, lineHeight: timerSize }}>
         {formatTime(view?.remaining ?? 0)}
       </Txt>
       {/* The signal text repeats the colour state: colour is never the only signal. */}
-      <Txt variant="heading" style={{ color: ink, minHeight: 28 }}>
+      <Txt
+        variant={compact ? 'body' : 'heading'}
+        style={{ color: ink, minHeight: compact ? 20 : 28 }}
+      >
         {view?.signalText ? signalText(view.signalText) : ' '}
       </Txt>
       {tk.next && view?.state !== 'zero' && (
@@ -134,47 +143,8 @@ export function GameClockPanel({ tk, compact }: { tk: TimekeeperApi; compact?: b
         ? palette.signalWarn
         : palette.surface;
   const ink = fill === palette.surface ? palette.ink : readableOn(fill);
-  return (
-    <View
-      style={[
-        styles.clock,
-        compact && styles.clockCompact,
-        { backgroundColor: fill, borderColor: palette.ink },
-      ]}
-    >
-      <View style={styles.clockRow}>
-        <View
-          accessible
-          accessibilityLabel={`${t('timekeeper.gameClock')} ${formatTime(tk.clockSeconds)}`}
-        >
-          <Txt variant="small" style={{ color: ink }}>
-            {t('timekeeper.gameClock')}
-          </Txt>
-          <Txt variant="figure" style={[{ color: ink }, compact && { fontSize: SIZE.lg }]}>
-            {formatTime(tk.clockSeconds)}
-          </Txt>
-        </View>
-        <View style={{ flex: 1, gap: SPACE.sm }}>
-          {clock.running ? (
-            <View style={styles.clockButtons}>
-              {/* Mark only feeds the mark list, which the compact panel hides. */}
-              {!compact && (
-                <View style={{ flex: 1 }}>
-                  <Button label={t('timekeeper.mark')} kind="secondary" onPress={tk.mark} />
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Button label={t('timekeeper.pause')} kind="secondary" onPress={tk.pauseClock} />
-              </View>
-            </View>
-          ) : (
-            <Button
-              label={started ? t('timekeeper.resumeClock') : t('timekeeper.startClock')}
-              onPress={tk.startClock}
-            />
-          )}
-        </View>
-      </View>
+  const notices = (
+    <>
       {tk.session.startWarning && !clock.running && (
         <Txt variant="heading" style={{ color: ink }}>
           {t('timekeeper.clockMissed')}
@@ -192,7 +162,90 @@ export function GameClockPanel({ tk, compact }: { tk: TimekeeperApi; compact?: b
           </Txt>
         </Pressable>
       )}
-      {!compact && tk.session.marks.length > 0 && (
+    </>
+  );
+
+  // Live game screen: a plain text line, no border, so it reads as information and not as
+  // another button row. Pause is rarely needed, so it is a small text link. The fill colour
+  // still appears behind the line at a cap or a missed start.
+  if (compact) {
+    const link = clock.running
+      ? { label: t('timekeeper.pause'), onPress: tk.pauseClock }
+      : {
+          label: started ? t('timekeeper.resumeClock') : t('timekeeper.startClock'),
+          onPress: tk.startClock,
+        };
+    return (
+      <View
+        style={[
+          styles.clockLine,
+          fill !== palette.surface && { backgroundColor: fill, borderRadius: 8 },
+        ]}
+      >
+        <View style={styles.clockInline}>
+          <View
+            accessible
+            accessibilityLabel={`${t('timekeeper.gameClock')} ${formatTime(tk.clockSeconds)}`}
+            style={styles.clockInline}
+          >
+            <Txt variant="small" style={{ color: ink }}>
+              {t('timekeeper.gameClock')}
+            </Txt>
+            <Txt variant="figure" style={{ color: ink, fontSize: SIZE.md }}>
+              {formatTime(tk.clockSeconds)}
+            </Txt>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={link.label}
+            onPress={link.onPress}
+            hitSlop={{ top: 14, bottom: 14 }}
+            style={styles.clockLink}
+          >
+            <Txt variant="small" style={{ color: ink, textDecorationLine: 'underline' }}>
+              {link.label}
+            </Txt>
+          </Pressable>
+        </View>
+        {notices}
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.clock, { backgroundColor: fill, borderColor: palette.ink }]}>
+      <View style={styles.clockRow}>
+        <View
+          accessible
+          accessibilityLabel={`${t('timekeeper.gameClock')} ${formatTime(tk.clockSeconds)}`}
+        >
+          <Txt variant="small" style={{ color: ink }}>
+            {t('timekeeper.gameClock')}
+          </Txt>
+          <Txt variant="figure" style={{ color: ink }}>
+            {formatTime(tk.clockSeconds)}
+          </Txt>
+        </View>
+        <View style={{ flex: 1, gap: SPACE.sm }}>
+          {clock.running ? (
+            <View style={styles.clockButtons}>
+              <View style={{ flex: 1 }}>
+                <Button label={t('timekeeper.mark')} kind="secondary" onPress={tk.mark} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button label={t('timekeeper.pause')} kind="secondary" onPress={tk.pauseClock} />
+              </View>
+            </View>
+          ) : (
+            <Button
+              label={started ? t('timekeeper.resumeClock') : t('timekeeper.startClock')}
+              onPress={tk.startClock}
+            />
+          )}
+        </View>
+      </View>
+      {notices}
+      {tk.session.marks.length > 0 && (
         <ScrollView style={{ maxHeight: 140 }}>
           {[...tk.session.marks].reverse().map((m, i) => (
             <View key={`${m.key}-${m.number}-${i}`} style={styles.markRow}>
@@ -206,19 +259,20 @@ export function GameClockPanel({ tk, compact }: { tk: TimekeeperApi; compact?: b
           ))}
         </ScrollView>
       )}
-      {!compact && started && (
-        <Button label={t('timekeeper.reset')} kind="secondary" onPress={tk.resetClock} />
-      )}
+      {started && <Button label={t('timekeeper.reset')} kind="secondary" onPress={tk.resetClock} />}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   bar: { borderWidth: 2, borderRadius: 12, padding: SPACE.lg, alignItems: 'center', gap: 2 },
+  barCompact: { paddingVertical: SPACE.sm, paddingHorizontal: SPACE.md, gap: 0 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
   cell: { width: '48%', flexGrow: 1 },
   clock: { borderWidth: 2, borderRadius: 12, padding: SPACE.md, gap: SPACE.sm },
-  clockCompact: { padding: SPACE.sm, gap: SPACE.xs },
+  clockLine: { paddingVertical: SPACE.xs, paddingHorizontal: SPACE.sm, gap: SPACE.xs },
+  clockInline: { flexDirection: 'row', alignItems: 'baseline', gap: SPACE.sm },
+  clockLink: { marginLeft: 'auto', paddingHorizontal: SPACE.sm },
   clockRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
   clockButtons: { flexDirection: 'row', gap: SPACE.sm },
   markRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },

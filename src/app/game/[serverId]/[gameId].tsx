@@ -40,7 +40,6 @@ export default function GameScreen() {
   const [tab, setTab] = useState<Tab>('live');
   const [goalSide, setGoalSide] = useState<Side | null>(null);
   const [asking, setAsking] = useState<Asking>(null);
-  const [more, setMore] = useState(false);
   const [confirmFinal, setConfirmFinal] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [autoPoint, setAutoPoint] = useState(true);
@@ -193,6 +192,9 @@ export default function GameScreen() {
 
       {tab === 'live' && (
         <View style={{ flex: 1 }}>
+          <View style={styles.clockRow}>
+            <GameClockPanel tk={tk} compact />
+          </View>
           <View style={styles.halves}>
             {(['home', 'away'] as const).map((side) => (
               <TeamHalf
@@ -213,44 +215,27 @@ export default function GameScreen() {
             </Txt>
           )}
           <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.controls}>
-            <ActionTimerBar tk={tk} />
-            <GameClockPanel tk={tk} compact />
+            <ActionTimerBar tk={tk} compact />
             <ActionButtons
               tk={tk}
               onAction={onAction}
-              actions={
-                more
-                  ? [
-                      'betweenpoints',
-                      'timeout',
-                      'halfstart',
-                      'halftime',
-                      'dispute',
-                      'discretrieval',
-                    ]
-                  : ['betweenpoints', 'timeout']
-              }
+              actions={[
+                'betweenpoints',
+                'timeout',
+                'halfstart',
+                'halftime',
+                'dispute',
+                'discretrieval',
+              ]}
             />
-            <View style={layout.row}>
-              {state.rules.spirit_stoppages_enabled && (
-                <View style={{ flex: 1 }}>
-                  <Button
-                    label={t('game.spirit')}
-                    kind="secondary"
-                    size="live"
-                    onPress={() => setAsking('spirit')}
-                  />
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Button
-                  label={t('timekeeper.more')}
-                  kind="secondary"
-                  size="live"
-                  onPress={() => setMore(!more)}
-                />
-              </View>
-            </View>
+            {state.rules.spirit_stoppages_enabled && (
+              <Button
+                label={t('game.spirit')}
+                kind="secondary"
+                size="live"
+                onPress={() => setAsking('spirit')}
+              />
+            )}
           </ScrollView>
         </View>
       )}
@@ -459,6 +444,7 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   header: { paddingHorizontal: SPACE.lg, paddingTop: SPACE.sm },
   tabs: { paddingHorizontal: SPACE.lg, paddingVertical: SPACE.sm },
+  clockRow: { paddingHorizontal: SPACE.lg, paddingBottom: SPACE.sm },
   halves: { flexDirection: 'row' },
   controls: { padding: SPACE.lg, gap: SPACE.md },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },

@@ -21,6 +21,9 @@ const numberOf = (state: GameState, side: Side, id: number): string => {
 export { nameOf, numberOf };
 
 /** One flooded half of the live screen: team colour, score, timeouts left, and ±1 buttons. */
+// Smaller than SIZE.score so the action buttons below get the room.
+const SCORE_SIZE = 64;
+
 export function TeamHalf({
   name,
   color,
@@ -78,7 +81,7 @@ export function TeamHalf({
         variant="figure"
         adjustsFontSizeToFit
         numberOfLines={1}
-        style={{ color: ink, fontSize: SIZE.score, lineHeight: SIZE.score * 1.05 }}
+        style={{ color: ink, fontSize: SCORE_SIZE, lineHeight: SCORE_SIZE * 1.05 }}
       >
         {points}
       </Txt>
@@ -379,8 +382,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACE.md,
-    gap: SPACE.sm,
+    padding: SPACE.sm,
+    gap: SPACE.xs,
   },
   steps: { flexDirection: 'row', gap: SPACE.sm, alignSelf: 'stretch' },
   step: {
