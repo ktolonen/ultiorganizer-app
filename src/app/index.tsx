@@ -1,13 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { deleteLinkToken } from '../store/secure';
-import { AUTO_POINT_KEY, parseAutoPoint, type Repo, type ServerRow } from '../store/repo';
+import type { Repo, ServerRow } from '../store/repo';
 import { getRepo } from '../store/sqlite';
 import { Button, Divider, layout, Screen, Txt } from '../ui/components';
 import { useTheme } from '../ui/theme';
-import { useThemeMode, type ThemeMode } from '../ui/theme';
+import { SPACE, TARGET } from '../ui/tokens';
 
 type RecentGame = Awaited<ReturnType<Repo['listGames']>>[number];
 
@@ -15,15 +15,8 @@ export default function Home() {
   const { t } = useTranslation();
   const router = useRouter();
   const { palette } = useTheme();
-  const [servers, setServers] = useState<ServerRow[]>([]);
+  const [servers, setServers] = useState<ServerRow[] | null>(null);
   const [games, setGames] = useState<RecentGame[]>([]);
-  const { mode, setMode } = useThemeMode();
-  const [autoPoint, setAutoPoint] = useState(true);
-  useEffect(() => {
-    void getRepo().then(async (r) =>
-      setAutoPoint(parseAutoPoint(await r.getSetting(AUTO_POINT_KEY))),
-    );
-  }, []);
 
   const load = useCallback(async () => {
     const repo = await getRepo();
@@ -54,92 +47,91 @@ export default function Home() {
       ],
     );
 
-  const serverLabel = (id: number) => servers.find((s) => s.id === id)?.label ?? '';
-  const modes: ThemeMode[] = ['system', 'day', 'night'];
+  const serverLabel = (id: number) => servers?.find((s) => s.id === id)?.label ?? '';
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={layout.page}>
-        <Txt variant="title" accessibilityRole="header">
-          {t('home.title')}
-        </Txt>
+      <ScrollView contentContainerStyle={layout.scroll}>
+        <View style={layout.row}>
+          <Txt variant="title" accessibilityRole="header" style={{ flex: 1 }}>
+            {t('home.title')}
+          </Txt>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.title')}
+            onPress={() => router.push('/settings')}
+            hitSlop={8}
+            style={({ pressed }) => [styles.headerLink, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Txt variant="heading">{t('settings.title')}</Txt>
+          </Pressable>
+        </View>
+
+        {servers?.length === 0 && <Txt muted>{t('home.noServers')}</Txt>}
         <Button label={t('home.scan')} onPress={() => router.push('/scan')} />
         <Button
           label={t('home.timekeeper')}
           kind="secondary"
           onPress={() => router.push('/timekeeper')}
         />
-        <Button label={t('home.pair')} kind="secondary" onPress={() => router.push('/pair')} />
-
-        {servers.length > 0 && (
-          <View style={{ gap: 4 }}>
-            <Txt variant="heading">{t('home.servers')}</Txt>
-            {servers.map((s) => (
-              <Txt key={s.id} muted>
-                {s.label}
-              </Txt>
-            ))}
-          </View>
-        )}
 
         <Divider />
-        <Txt variant="heading">{t('home.recent')}</Txt>
+        <Txt variant="heading" accessibilityRole="header">
+          {t('home.recent')}
+        </Txt>
         {games.length === 0 && <Txt muted>{t('home.recentEmpty')}</Txt>}
         {games.map((g) => (
-          <View key={`${g.serverId}:${g.gameId}`} style={{ gap: 4 }}>
-            <Button
-              label={g.title}
-              kind="secondary"
+          <View
+            key={`${g.serverId}:${g.gameId}`}
+            style={[styles.card, { borderColor: palette.line }]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={g.title}
               onPress={() => router.push(`/game/${g.serverId}/${g.gameId}`)}
-            />
-            <View style={layout.row}>
-              <Txt variant="small" muted style={{ flex: 1 }}>
-                {serverLabel(g.serverId)} ·{' '}
-                {g.unsent > 0 ? t('home.unsent', { count: g.unsent }) : t('home.synced')}
+              style={({ pressed }) => [styles.cardMain, { opacity: pressed ? 0.6 : 1 }]}
+            >
+              <Txt variant="heading">{g.title}</Txt>
+              <Txt variant="small" muted>
+                {serverLabel(g.serverId)}
+                {' · '}
+                <Txt
+                  variant="small"
+                  style={{ color: g.unsent > 0 ? palette.signalStop : palette.muted }}
+                >
+                  {g.unsent > 0 ? t('home.unsent', { count: g.unsent }) : t('home.synced')}
+                </Txt>
               </Txt>
-              <Txt
-                variant="small"
-                accessibilityRole="button"
-                onPress={() => remove(g)}
-                style={{ color: palette.signalStop, padding: 8 }}
-              >
-                {t('home.delete')}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t('home.delete')}: ${g.title}`}
+              onPress={() => remove(g)}
+              style={({ pressed }) => [styles.cardDelete, { opacity: pressed ? 0.6 : 1 }]}
+            >
+              <Txt variant="small" style={{ color: palette.signalStop }}>
+                {t('home.deleteShort')}
               </Txt>
-            </View>
+            </Pressable>
           </View>
         ))}
-
-        <Divider />
-        <Txt variant="heading">{t('settings.theme')}</Txt>
-        <View style={layout.row}>
-          {modes.map((m) => (
-            <View key={m} style={{ flex: 1 }}>
-              <Button
-                label={t(`settings.theme.${m}`)}
-                kind={mode === m ? 'primary' : 'secondary'}
-                onPress={async () => {
-                  setMode(m);
-                  (await getRepo()).setSetting('theme', m);
-                }}
-              />
-            </View>
-          ))}
-        </View>
-
-        <Txt variant="heading">{t('settings.autoPoint')}</Txt>
-        <Txt variant="small" muted>
-          {t('settings.autoPoint.hint')}
-        </Txt>
-        <Button
-          label={autoPoint ? t('settings.on') : t('settings.off')}
-          kind={autoPoint ? 'primary' : 'secondary'}
-          onPress={async () => {
-            const next = !autoPoint;
-            setAutoPoint(next);
-            (await getRepo()).setSetting(AUTO_POINT_KEY, next ? 'on' : 'off');
-          }}
-        />
       </ScrollView>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  headerLink: { minHeight: TARGET.min, justifyContent: 'center', paddingHorizontal: SPACE.xs },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderRadius: 12,
+  },
+  cardMain: { flex: 1, gap: 2, padding: SPACE.md, minHeight: TARGET.min },
+  cardDelete: {
+    minHeight: TARGET.min,
+    justifyContent: 'center',
+    paddingHorizontal: SPACE.md,
+  },
+});

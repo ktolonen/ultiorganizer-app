@@ -65,7 +65,7 @@ export default function Games() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={layout.page}>
+      <ScrollView contentContainerStyle={layout.scroll}>
         <Txt variant="title" accessibilityRole="header">
           {t('games.title')}
         </Txt>

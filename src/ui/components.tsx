@@ -87,16 +87,20 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         {
-          minHeight: TARGET[size],
+          height: TARGET[size],
           backgroundColor: primary ? palette.ink : palette.surface,
           borderColor: palette.ink,
           opacity: disabled ? 0.4 : pressed ? 0.8 : 1,
         },
       ]}
     >
+      {/* Fixed-height button: the label follows the system text size, then shrinks to fit. */}
       <Text
         allowFontScaling
         maxFontSizeMultiplier={2}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
         style={{
           fontFamily: FONTS.textBold,
           fontSize: SIZE.md,
@@ -120,6 +124,8 @@ export function Divider() {
 
 export const layout = StyleSheet.create({
   page: { flex: 1, padding: SPACE.lg, gap: SPACE.md },
+  /** ScrollView content: flexGrow, since flex: 1 caps content at the viewport and blocks scrolling. */
+  scroll: { flexGrow: 1, padding: SPACE.lg, gap: SPACE.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
 });
 
@@ -129,7 +135,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: 12,
     paddingHorizontal: SPACE.lg,
-    paddingVertical: SPACE.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

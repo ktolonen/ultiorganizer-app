@@ -39,12 +39,14 @@ export default function Pair() {
     );
     setBusy(false);
     if (!result.ok) return setError(t(pairErrorKey(result.error)));
-    router.replace('/');
+    // Return to where pairing was started: Settings, or the scanner after a game QR.
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
   };
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={layout.page} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={layout.scroll} keyboardShouldPersistTaps="handled">
         <Txt variant="title" accessibilityRole="header">
           {t('pair.title')}
         </Txt>
@@ -89,6 +91,7 @@ export default function Pair() {
           onPress={() => void submit()}
           disabled={busy || !root || !token}
         />
+        <Button label={t('common.back')} kind="secondary" onPress={() => router.back()} />
       </ScrollView>
     </Screen>
   );

@@ -15,7 +15,7 @@ export default function TimekeeperScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={layout.page}>
+      <ScrollView contentContainerStyle={layout.scroll}>
         <View style={layout.row}>
           <Txt variant="title" accessibilityRole="header" style={{ flex: 1 }}>
             {t('timekeeper.title')}

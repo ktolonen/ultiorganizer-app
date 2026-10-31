@@ -249,7 +249,7 @@ export default function GameScreen() {
       )}
 
       {tab === 'sheet' && (
-        <ScrollView contentContainerStyle={layout.page}>
+        <ScrollView contentContainerStyle={layout.scroll}>
           <Button
             label={t('game.undo')}
             kind="secondary"
@@ -303,7 +303,7 @@ export default function GameScreen() {
       )}
 
       {tab === 'rosters' && (
-        <ScrollView contentContainerStyle={layout.page}>
+        <ScrollView contentContainerStyle={layout.scroll}>
           {(['home', 'away'] as const).map((side) => (
             <RosterEditor
               key={side}
@@ -317,7 +317,7 @@ export default function GameScreen() {
       )}
 
       {tab === 'finish' && (
-        <ScrollView contentContainerStyle={layout.page}>
+        <ScrollView contentContainerStyle={layout.scroll}>
           <Txt variant="title">
             {names.home} {score.home} – {score.away} {names.away}
           </Txt>

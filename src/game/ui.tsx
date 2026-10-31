@@ -118,7 +118,7 @@ function Chip({
       style={[
         styles.chip,
         {
-          minHeight: big ? TARGET.live : TARGET.min,
+          height: big ? TARGET.live : TARGET.min,
           minWidth: big ? TARGET.live : TARGET.min,
           borderColor: palette.ink,
           backgroundColor: selected ? palette.ink : (color ?? palette.surface),
@@ -127,6 +127,9 @@ function Chip({
     >
       <Txt
         variant={big ? 'figure' : 'body'}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
         style={{
           color: selected ? palette.surface : color ? readableOn(color) : palette.ink,
           fontFamily: big ? FONTS.figures : FONTS.textBold,
@@ -259,6 +262,9 @@ export function TeamPicker({
               >
                 <Txt
                   variant="heading"
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.5}
                   style={{ color: readableOn(colors[side]), textAlign: 'center' }}
                 >
                   {names[side]}
@@ -413,7 +419,7 @@ const styles = StyleSheet.create({
   },
   teamButton: {
     flex: 1,
-    minHeight: TARGET.live * 1.5,
+    height: TARGET.live * 1.5,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
