@@ -83,6 +83,15 @@ export default function GameScreen() {
     else saveGoal({ scorerId: null, assistId: null, callahan: false }, side); // Unknown, Unknown
   };
 
+  // −1 takes back what +1 added: a score tap in result-only keeping, otherwise the last
+  // goal, and only from the side that scored it.
+  const minusFor = (side: Side): (() => void) | undefined => {
+    if (isFinal || score[side] <= 0) return undefined;
+    if (bothRostersEmpty) return () => apply({ type: 'score_tap', side, delta: -1 });
+    if (state.goals[state.goals.length - 1]?.side !== side) return undefined;
+    return () => report(game.undoGoal());
+  };
+
   const saveGoal = (
     goal: { scorerId: number | null; assistId: number | null; callahan: boolean },
     side: Side | null = goalSide,
@@ -193,12 +202,8 @@ export default function GameScreen() {
                 points={score[side]}
                 timeoutsLeft={timeoutsLeft(state, side)}
                 timeoutsTotal={state.rules.timeouts_per_team}
-                onPress={() => tapScore(side)}
-                onMinus={
-                  !hasRoster(side) && !isFinal
-                    ? () => apply({ type: 'score_tap', side, delta: -1 })
-                    : undefined
-                }
+                onPlus={isFinal ? undefined : () => tapScore(side)}
+                onMinus={minusFor(side)}
               />
             ))}
           </View>
@@ -207,10 +212,7 @@ export default function GameScreen() {
               {t('game.noRoster')}
             </Txt>
           )}
-          <ScrollView
-            style={{ flexGrow: 0, maxHeight: '48%' }}
-            contentContainerStyle={styles.controls}
-          >
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.controls}>
             <ActionTimerBar tk={tk} />
             <GameClockPanel tk={tk} compact />
             <ActionButtons
@@ -457,7 +459,7 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   header: { paddingHorizontal: SPACE.lg, paddingTop: SPACE.sm },
   tabs: { paddingHorizontal: SPACE.lg, paddingVertical: SPACE.sm },
-  halves: { flex: 1, flexDirection: 'row', minHeight: 180 },
+  halves: { flexDirection: 'row' },
   controls: { padding: SPACE.lg, gap: SPACE.md },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {

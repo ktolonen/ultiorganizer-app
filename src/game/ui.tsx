@@ -20,14 +20,14 @@ const numberOf = (state: GameState, side: Side, id: number): string => {
 
 export { nameOf, numberOf };
 
-/** One flooded half of the live screen: team colour, score, timeouts left. */
+/** One flooded half of the live screen: team colour, score, timeouts left, and ±1 buttons. */
 export function TeamHalf({
   name,
   color,
   points,
   timeoutsLeft,
   timeoutsTotal,
-  onPress,
+  onPlus,
   onMinus,
 }: {
   name: string;
@@ -35,7 +35,9 @@ export function TeamHalf({
   points: number;
   timeoutsLeft: number;
   timeoutsTotal: number;
-  onPress: () => void;
+  /** Omitted when the score cannot be raised (game final). */
+  onPlus?: () => void;
+  /** Omitted when this side has nothing to take back. */
   onMinus?: () => void;
 }) {
   const { t } = useTranslation();
@@ -43,11 +45,30 @@ export function TeamHalf({
   const dots = Array.from({ length: timeoutsTotal }, (_, i) => (i < timeoutsLeft ? '●' : '○')).join(
     '',
   );
-  return (
+  const step = (label: string, a11y: string, onPress?: () => void) => (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t('game.score', { team: name, points, timeouts: timeoutsLeft })}
+      accessibilityLabel={a11y}
+      accessibilityState={{ disabled: !onPress }}
+      disabled={!onPress}
       onPress={onPress}
+      style={[styles.step, { borderColor: ink, opacity: onPress ? 1 : 0.35 }]}
+    >
+      <Txt
+        variant="figure"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
+        style={{ color: ink, fontSize: SIZE.lg }}
+      >
+        {label}
+      </Txt>
+    </Pressable>
+  );
+  return (
+    <View
+      accessible
+      accessibilityLabel={t('game.score', { team: name, points, timeouts: timeoutsLeft })}
       style={[styles.half, { backgroundColor: color }]}
     >
       <Txt variant="heading" numberOfLines={2} style={{ color: ink, textAlign: 'center' }}>
@@ -57,26 +78,18 @@ export function TeamHalf({
         variant="figure"
         adjustsFontSizeToFit
         numberOfLines={1}
-        style={{ color: ink, fontSize: SIZE.hero, lineHeight: SIZE.hero * 1.05 }}
+        style={{ color: ink, fontSize: SIZE.score, lineHeight: SIZE.score * 1.05 }}
       >
         {points}
       </Txt>
-      <Txt variant="heading" style={{ color: ink }}>
+      <Txt variant="small" style={{ color: ink }}>
         {t('game.timeouts')} {dots}
       </Txt>
-      {onMinus && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="−1"
-          onPress={onMinus}
-          style={[styles.minus, { borderColor: ink }]}
-        >
-          <Txt variant="heading" style={{ color: ink }}>
-            −1
-          </Txt>
-        </Pressable>
-      )}
-    </Pressable>
+      <View style={styles.steps}>
+        {step('−1', t('game.removePoint', { team: name }), onMinus)}
+        {step('+1', t('game.addPoint', { team: name }), onPlus)}
+      </View>
+    </View>
   );
 }
 
@@ -342,12 +355,10 @@ const styles = StyleSheet.create({
     padding: SPACE.md,
     gap: SPACE.sm,
   },
-  minus: {
-    position: 'absolute',
-    right: SPACE.sm,
-    top: SPACE.sm,
-    minHeight: TARGET.min,
-    minWidth: TARGET.min,
+  steps: { flexDirection: 'row', gap: SPACE.sm, alignSelf: 'stretch' },
+  step: {
+    flex: 1,
+    height: TARGET.live,
     borderWidth: 2,
     borderRadius: 12,
     alignItems: 'center',
