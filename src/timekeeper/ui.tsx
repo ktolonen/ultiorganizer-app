@@ -135,7 +135,13 @@ export function GameClockPanel({ tk, compact }: { tk: TimekeeperApi; compact?: b
         : palette.surface;
   const ink = fill === palette.surface ? palette.ink : readableOn(fill);
   return (
-    <View style={[styles.clock, { backgroundColor: fill, borderColor: palette.ink }]}>
+    <View
+      style={[
+        styles.clock,
+        compact && styles.clockCompact,
+        { backgroundColor: fill, borderColor: palette.ink },
+      ]}
+    >
       <View style={styles.clockRow}>
         <View
           accessible
@@ -144,16 +150,19 @@ export function GameClockPanel({ tk, compact }: { tk: TimekeeperApi; compact?: b
           <Txt variant="small" style={{ color: ink }}>
             {t('timekeeper.gameClock')}
           </Txt>
-          <Txt variant="figure" style={{ color: ink }}>
+          <Txt variant="figure" style={[{ color: ink }, compact && { fontSize: SIZE.lg }]}>
             {formatTime(tk.clockSeconds)}
           </Txt>
         </View>
         <View style={{ flex: 1, gap: SPACE.sm }}>
           {clock.running ? (
             <View style={styles.clockButtons}>
-              <View style={{ flex: 1 }}>
-                <Button label={t('timekeeper.mark')} kind="secondary" onPress={tk.mark} />
-              </View>
+              {/* Mark only feeds the mark list, which the compact panel hides. */}
+              {!compact && (
+                <View style={{ flex: 1 }}>
+                  <Button label={t('timekeeper.mark')} kind="secondary" onPress={tk.mark} />
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <Button label={t('timekeeper.pause')} kind="secondary" onPress={tk.pauseClock} />
               </View>
@@ -209,6 +218,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
   cell: { width: '48%', flexGrow: 1 },
   clock: { borderWidth: 2, borderRadius: 12, padding: SPACE.md, gap: SPACE.sm },
+  clockCompact: { padding: SPACE.sm, gap: SPACE.xs },
   clockRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
   clockButtons: { flexDirection: 'row', gap: SPACE.sm },
   markRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
