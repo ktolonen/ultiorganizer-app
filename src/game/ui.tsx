@@ -275,7 +275,12 @@ export function TeamPicker({
   );
 }
 
-/** Rosters: tap a player to toggle, with the jersey number first and C / SC badges. */
+/**
+ * Rosters: tap a player to toggle, with the jersey number first and C / SC badges.
+ * Like the server's web form, a team with no saved roster shows every pickable player as
+ * selected. Nothing is queued until the user saves that default or changes it, so a game
+ * kept as a result only (no rosters) stays that way.
+ */
 export function RosterEditor({
   state,
   side,
@@ -289,7 +294,19 @@ export function RosterEditor({
 }) {
   const { t } = useTranslation();
   const { palette } = useTheme();
-  const current = state.rosters[side];
+  const isBlocked = (p: { accredited?: boolean }) =>
+    state.rules.require_accreditation && p.accredited === false;
+  const pickable = state.eligible[side].filter((p) => !isBlocked(p));
+  const saved = state.rosters[side];
+  const draft = saved.length === 0 && pickable.length > 0;
+  const current: RosterEntry[] = draft
+    ? pickable.map((p) => ({
+        player_id: p.player_id,
+        number: p.number,
+        captain: false,
+        spirit_captain: false,
+      }))
+    : saved;
   const on = (id: number) => current.find((p) => p.player_id === id);
   const toggle = (id: number, number: number | null) =>
     onSave(
@@ -303,9 +320,19 @@ export function RosterEditor({
   return (
     <View style={{ gap: SPACE.sm }}>
       <Txt variant="heading">{teamName}</Txt>
+      {state.eligible[side].length === 0 ? (
+        <Txt muted>{t('game.noPlayers')}</Txt>
+      ) : (
+        <Txt muted>
+          {draft
+            ? t('game.rosterDefault', { count: current.length })
+            : t('game.rosterCount', { count: saved.length, total: pickable.length })}
+        </Txt>
+      )}
+      {draft && <Button label={t('game.rosterSave')} onPress={() => onSave(current)} />}
       {state.eligible[side].map((p) => {
         const entry = on(p.player_id);
-        const blocked = state.rules.require_accreditation && p.accredited === false;
+        const blocked = isBlocked(p);
         return (
           <View
             key={p.player_id}
