@@ -16,7 +16,7 @@ import {
 } from '../sync/outbox';
 import { drain } from '../sync/sender';
 import { defaultTeamColors } from '../ui/tokens';
-import { applyEvent, undoLastGoal, uploadAll, type GameSession } from './runtime';
+import { applyEvent, refreshEligible, undoLastGoal, uploadAll, type GameSession } from './runtime';
 import { fromEntryContext, type GameError, type GameEvent } from './reducer';
 import { toGameData } from './upload';
 import type { EntryContext } from './types';
@@ -119,6 +119,16 @@ export function useGame(serverId: number, gameId: number): GameHandle {
       ref.current = s;
       setSession(s);
       void kick();
+      // Players added on the server after the game was opened: refresh the pickable list in
+      // the background. Offline or refused reads keep the stored list.
+      if (creds.current && !s.outbox.offlineOnly) {
+        const r = await fetchEntryContext(creds.current, gameId);
+        const cur = ref.current;
+        if (r.ok && alive.current && cur) {
+          const next = refreshEligible(cur, r.data);
+          if (next !== cur) await commit(next);
+        }
+      }
     })();
     const sub = AppState.addEventListener('change', (st) => st === 'active' && void kick());
     return () => {
@@ -126,7 +136,7 @@ export function useGame(serverId: number, gameId: number): GameHandle {
       sub.remove();
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [serverId, gameId, kick]);
+  }, [serverId, gameId, kick, commit]);
 
   // A conflict or a refused row pauses the queue: fetch the server's version so the sheet can
   // show both. A refused row cannot simply be dropped, because local state already contains it.

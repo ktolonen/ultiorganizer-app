@@ -104,3 +104,39 @@ export function undoLastGoal(session: GameSession, deps: Deps): ApplyResult {
 export function uploadAll(session: GameSession, deps: Deps): ApplyResult {
   return queueUpload(session, session.state, deps);
 }
+
+/**
+ * Takes the server's current list of players a team can field, so players added on the
+ * server after the game was opened become pickable. Only the eligible lists change: local
+ * rosters, goals and the outbox stay as they are. A side is skipped when its team differs
+ * from the local one (the server's game changed under us; a conflict handles that).
+ * A player the server no longer lists stays eligible while a local roster or goal uses
+ * them, so the next roster edit still validates. Returns the same session when nothing changed.
+ */
+export function refreshEligible(session: GameSession, fresh: EntryContext): GameSession {
+  if (fresh.game.game_id !== session.gameId) return session;
+  const { state, context } = session;
+  let changed = false;
+  const eligible = { ...state.eligible };
+  const ctx = { ...context };
+  for (const side of ['home', 'away'] as const) {
+    if (fresh[side].team_id === null || fresh[side].team_id !== state.teamIds[side]) continue;
+    const inUse = new Set<number>([
+      ...state.rosters[side].map((p) => p.player_id),
+      ...state.goals
+        .filter((g) => g.side === side)
+        .flatMap((g) => [g.scorerId, g.assistId])
+        .filter((id): id is number => id !== null),
+    ]);
+    const freshIds = new Set(fresh[side].eligible_players.map((p) => p.player_id));
+    const next = [
+      ...fresh[side].eligible_players,
+      ...state.eligible[side].filter((p) => inUse.has(p.player_id) && !freshIds.has(p.player_id)),
+    ];
+    if (JSON.stringify(next) === JSON.stringify(state.eligible[side])) continue;
+    changed = true;
+    eligible[side] = next;
+    ctx[side] = { ...ctx[side], eligible_players: next };
+  }
+  return changed ? { ...session, context: ctx, state: { ...state, eligible } } : session;
+}

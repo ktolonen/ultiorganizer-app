@@ -1,6 +1,6 @@
 import { newOutbox, markSending, onResponse, nextToSend, type OutboxState } from '../sync/outbox';
 import { entryContextFixture } from './fixtures';
-import { applyEvent, undoLastGoal, uploadAll, type GameSession } from './runtime';
+import { applyEvent, refreshEligible, undoLastGoal, uploadAll, type GameSession } from './runtime';
 import { fromEntryContext, type GameEvent } from './reducer';
 
 let k = 0;
@@ -132,5 +132,55 @@ describe('uploadAll', () => {
     let s = must(applyEvent(session(true), goal(10), deps()));
     s = must(uploadAll(s, deps()));
     expect(s.outbox.rows).toHaveLength(1);
+  });
+});
+
+describe('refreshEligible', () => {
+  const withPlayers = (home: number[], away: number[]) => {
+    const base = entryContextFixture();
+    const p = (id: number) => ({ player_id: id, name: `Player ${id}`, number: id });
+    return entryContextFixture({
+      home: { ...base.home, eligible_players: home.map(p) },
+      away: { ...base.away, eligible_players: away.map(p) },
+    });
+  };
+
+  it('adds players the server lists now, leaving rosters, goals and outbox alone', () => {
+    const s = must(applyEvent(session(), goal(10), deps()));
+    const next = refreshEligible(s, withPlayers([1, 2, 3, 4, 5], [11, 12, 13, 14]));
+    expect(next.state.eligible.home.map((p) => p.player_id)).toEqual([1, 2, 3, 4, 5]);
+    expect(next.state.eligible.away.map((p) => p.player_id)).toEqual([11, 12, 13, 14]);
+    expect(next.context.home.eligible_players).toEqual(next.state.eligible.home);
+    expect(next.state.rosters).toEqual(s.state.rosters);
+    expect(next.state.goals).toEqual(s.state.goals);
+    expect(next.outbox).toBe(s.outbox);
+  });
+
+  it('keeps a player the server dropped while a local roster uses them', () => {
+    const next = refreshEligible(session(), withPlayers([2, 3, 4], [11, 12, 13]));
+    expect(next.state.eligible.home.map((p) => p.player_id)).toEqual([2, 3, 4, 1]);
+    // The roster still validates against the merged list.
+    const r = applyEvent(
+      next,
+      { type: 'roster', side: 'home', players: next.state.rosters.home },
+      deps(),
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it('drops a player nobody uses and returns the same session when nothing changed', () => {
+    const s = session();
+    expect(refreshEligible(s, entryContextFixture())).toBe(s);
+    const next = refreshEligible(s, withPlayers([1, 2, 3], [11, 12, 13]));
+    expect(next.state.eligible.home.map((p) => p.player_id)).toEqual([1, 2, 3]);
+  });
+
+  it('skips a side whose team changed on the server, and another game entirely', () => {
+    const s = session();
+    const base = withPlayers([1, 2, 3, 4, 5], [11, 12, 13]);
+    const otherTeam = { ...base, home: { ...base.home, team_id: 999 } };
+    expect(refreshEligible(s, otherTeam)).toBe(s);
+    const otherGame = { ...base, game: { ...base.game, game_id: 999 } };
+    expect(refreshEligible(s, otherGame)).toBe(s);
   });
 });
