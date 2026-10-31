@@ -26,7 +26,8 @@ import { useTheme } from '../../../ui/theme';
 import { SPACE, TARGET } from '../../../ui/tokens';
 
 type Tab = 'live' | 'sheet' | 'rosters' | 'finish';
-type Asking = null | 'timeout' | 'spirit' | 'offence';
+// 'offence' asks at the first Start of half; 'offenceEdit' only corrects the saved value.
+type Asking = null | 'timeout' | 'spirit' | 'offence' | 'offenceEdit';
 
 export default function GameScreen() {
   const params = useLocalSearchParams<{ serverId: string; gameId: string }>();
@@ -109,7 +110,13 @@ export default function GameScreen() {
 
   const onAction = (id: Parameters<typeof tk.start>[0]) => {
     if (id === 'timeout') return setAsking('timeout');
-    if (id === 'halfstart') return setAsking('offence');
+    if (id === 'halfstart') {
+      // Starting offence is a game fact, asked once. Later halves just start the timer;
+      // a wrong pick is corrected on the Sheet tab.
+      if (state.startingOffence === null) return setAsking('offence');
+      tk.start('halfstart');
+      return;
+    }
     if (id === 'halftime') {
       tk.start('halftime');
       apply({ type: 'metadata', halftime: clockSeconds });
@@ -131,8 +138,9 @@ export default function GameScreen() {
         tk.pauseClock();
       }
     } else if (kind === 'offence') {
-      apply({ type: 'metadata', startingOffence: side });
-      tk.start('halfstart');
+      if (apply({ type: 'metadata', startingOffence: side })) tk.start('halfstart');
+    } else if (kind === 'offenceEdit') {
+      if (state.startingOffence !== side) apply({ type: 'metadata', startingOffence: side });
     }
   };
 
@@ -282,6 +290,12 @@ export default function GameScreen() {
             {t('term.startingOffence')}:{' '}
             {state.startingOffence ? names[state.startingOffence] : '–'}
           </Txt>
+          <Button
+            label={t('game.changeOffence')}
+            kind="secondary"
+            disabled={isFinal}
+            onPress={() => setAsking('offenceEdit')}
+          />
           <Txt muted>
             {t('term.halftime')}: {state.halftime !== null ? formatTime(state.halftime) : '–'}
           </Txt>

@@ -91,6 +91,7 @@
   "game.notSynced": "Waiting to sync. The game is saved on this phone and will be sent when the connection returns.",
   "game.noRoster": "Set the rosters to record goals, or use +1 and −1 to count points only.",
   "game.noTimeoutsLeft": "No timeouts left",
+  "game.changeOffence": "Change starting offence",
   "game.conflict.title": "Someone else changed this game",
   "game.conflict.keepServer": "Keep the server version",
   "game.conflict.uploadMine": "Upload my version",
