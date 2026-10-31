@@ -74,7 +74,8 @@ export async function ensureNotificationPermission(): Promise<boolean> {
       await Notifications.setNotificationChannelAsync(CHANNEL, {
         name: 'Timekeeper signals',
         importance: AndroidImportance.HIGH,
-        sound: 'default',
+        // No `sound` key: omitting it gives the system default. A string here is
+        // looked up as a bundled file, and 'default' logs "custom sound not found".
       });
     }
     const current = await Notifications.getPermissionsAsync();
