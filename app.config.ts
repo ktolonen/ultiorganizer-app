@@ -8,6 +8,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: isDev ? 'Ultiorganizer Field (dev)' : 'Ultiorganizer Field',
   slug: 'ultiorganizer-field',
+  owner: 'ultiorganizer-team',
   version: '0.1.0',
   orientation: 'default',
   icon: './assets/images/icon.png',
@@ -42,6 +43,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ['expo-notifications', { enableBackgroundRemoteNotifications: false }],
     ['expo-build-properties', { android: { usesCleartextTraffic: isDev } }],
   ],
-  extra: { devHttp: isDev },
+  extra: { devHttp: isDev, eas: { projectId: 'e0f56510-4595-4388-860e-fe6f32be9101' } },
   experiments: { reactCompiler: true },
 });
