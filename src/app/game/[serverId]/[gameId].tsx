@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { currentScore, timeoutsLeft, type GameEvent } from '../../../game/reducer';
+import { cleanOfficial, currentScore, timeoutsLeft, type GameEvent } from '../../../game/reducer';
 import type { Side } from '../../../game/types';
 import {
   ColorPicker,
@@ -10,11 +10,12 @@ import {
   nameOf,
   numberOf,
   RosterEditor,
+  ScorekeeperField,
   TeamHalf,
   TeamPicker,
 } from '../../../game/ui';
 import { useGame, type ActionError } from '../../../game/useGame';
-import { AUTO_POINT_KEY, gameScope, parseAutoPoint } from '../../../store/repo';
+import { AUTO_POINT_KEY, gameScope, parseAutoPoint, SCOREKEEPER_KEY } from '../../../store/repo';
 import { getRepo } from '../../../store/sqlite';
 import { isFullySynced, unsentRows } from '../../../sync/outbox';
 import { ActionButtons, ActionTimerBar, formatTime, GameClockPanel } from '../../../timekeeper/ui';
@@ -44,11 +45,25 @@ export default function GameScreen() {
   const [confirmFinal, setConfirmFinal] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [autoPoint, setAutoPoint] = useState(true);
+  const [savedName, setSavedName] = useState<string | null>(null);
   useEffect(() => {
-    void getRepo().then(async (r) =>
-      setAutoPoint(parseAutoPoint(await r.getSetting(AUTO_POINT_KEY))),
-    );
+    void getRepo().then(async (r) => {
+      setAutoPoint(parseAutoPoint(await r.getSetting(AUTO_POINT_KEY)));
+      setSavedName(cleanOfficial((await r.getSetting(SCOREKEEPER_KEY)) ?? ''));
+    });
   }, []);
+
+  // A game with no scorekeeper gets the name from Settings, once per opening. A name already
+  // on the game (set on the server or here) is never replaced.
+  const nameFilled = useRef(false);
+  const loadedState = game.session?.state;
+  useEffect(() => {
+    if (nameFilled.current || !loadedState || savedName === null) return;
+    nameFilled.current = true;
+    if (savedName && loadedState.official === null && loadedState.result?.state !== 'final') {
+      game.apply({ type: 'metadata', official: savedName });
+    }
+  }, [loadedState, savedName, game]);
 
   if (!game.loaded || !game.session || !tk.ready) return <Screen />;
   const { state, context, outbox } = game.session;
@@ -299,6 +314,13 @@ export default function GameScreen() {
           <Txt muted>
             {t('term.halftime')}: {state.halftime !== null ? formatTime(state.halftime) : '–'}
           </Txt>
+          <Divider />
+          <ScorekeeperField
+            key={state.official ?? ''}
+            value={state.official}
+            disabled={isFinal}
+            onSave={(official) => apply({ type: 'metadata', official })}
+          />
         </ScrollView>
       )}
 

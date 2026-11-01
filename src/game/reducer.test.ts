@@ -2,6 +2,7 @@ import { entryContextFixture } from './fixtures';
 import {
   type GameEvent,
   type GameState,
+  cleanOfficial,
   currentScore,
   fromEntryContext,
   reduce,
@@ -275,6 +276,12 @@ describe('metadata and finalize', () => {
     expect(code(base(), { type: 'metadata', official: 'x'.repeat(51) })).toBe(
       'validation_failed:official',
     );
+  });
+  it('trims a typed scorekeeper name and caps it at the accepted length', () => {
+    expect(cleanOfficial('  Kari  ')).toBe('Kari');
+    expect(cleanOfficial('   ')).toBe('');
+    expect(cleanOfficial('x'.repeat(60))).toHaveLength(50);
+    expect(code(base(), { type: 'metadata', official: cleanOfficial('x'.repeat(60)) })).toBe('ok');
   });
   it('finalizes only a game with a score, once', () => {
     expect(code(base(), { type: 'finalize' })).toBe('validation_failed');

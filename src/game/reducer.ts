@@ -86,6 +86,10 @@ export const MAX_STOPPAGE_TIME = 86400;
 export const MAX_ROSTER = 100;
 export const MAX_OFFICIAL_LENGTH = 50;
 
+/** Trim a typed scorekeeper name and cap it at what the server accepts. */
+export const cleanOfficial = (name: string): string =>
+  name.trim().slice(0, MAX_OFFICIAL_LENGTH).trim();
+
 const other = (side: Side): Side => (side === 'home' ? 'away' : 'home');
 const fail = (code: GameErrorCode, message: string, path?: string): Reduced => ({
   ok: false,

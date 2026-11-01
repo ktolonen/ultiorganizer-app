@@ -5,6 +5,8 @@ import {
   type StyleProp,
   StyleSheet,
   Text,
+  TextInput,
+  type TextInputProps,
   type TextProps,
   type TextStyle,
   View,
@@ -113,6 +115,23 @@ export function Button({
   );
 }
 
+/** A single-line text input sized and coloured like the buttons. */
+export function TextField({ style, ...rest }: TextInputProps) {
+  const { palette } = useTheme();
+  return (
+    <TextInput
+      placeholderTextColor={palette.muted}
+      {...rest}
+      style={[
+        styles.input,
+        { borderColor: palette.ink, color: palette.ink },
+        rest.editable === false && { opacity: 0.4 },
+        style,
+      ]}
+    />
+  );
+}
+
 export function Field({ children }: { children: ReactNode }) {
   return <View style={styles.field}>{children}</View>;
 }
@@ -131,6 +150,14 @@ export const layout = StyleSheet.create({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  input: {
+    borderWidth: 2,
+    borderRadius: 12,
+    minHeight: TARGET.min,
+    paddingHorizontal: SPACE.md,
+    fontFamily: FONTS.text,
+    fontSize: SIZE.sm,
+  },
   button: {
     borderWidth: 2,
     borderRadius: 12,

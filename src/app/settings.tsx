@@ -2,9 +2,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { AUTO_POINT_KEY, parseAutoPoint, type ServerRow } from '../store/repo';
+import { cleanOfficial, MAX_OFFICIAL_LENGTH } from '../game/reducer';
+import { AUTO_POINT_KEY, parseAutoPoint, SCOREKEEPER_KEY, type ServerRow } from '../store/repo';
 import { getRepo } from '../store/sqlite';
-import { Button, Divider, layout, Screen, Txt } from '../ui/components';
+import { Button, Divider, layout, Screen, TextField, Txt } from '../ui/components';
 import { useThemeMode, type ThemeMode } from '../ui/theme';
 
 const MODES: ThemeMode[] = ['system', 'day', 'night'];
@@ -15,6 +16,7 @@ export default function Settings() {
   const { mode, setMode } = useThemeMode();
   const [servers, setServers] = useState<ServerRow[]>([]);
   const [autoPoint, setAutoPoint] = useState(true);
+  const [scorekeeper, setScorekeeper] = useState('');
 
   // Reload on focus so a server paired from here shows up on return.
   useFocusEffect(
@@ -22,6 +24,7 @@ export default function Settings() {
       void getRepo().then(async (repo) => {
         setServers(await repo.listServers());
         setAutoPoint(parseAutoPoint(await repo.getSetting(AUTO_POINT_KEY)));
+        setScorekeeper((await repo.getSetting(SCOREKEEPER_KEY)) ?? '');
       });
     }, []),
   );
@@ -46,6 +49,29 @@ export default function Settings() {
           </View>
         )}
         <Button label={t('home.pair')} kind="secondary" onPress={() => router.push('/pair')} />
+
+        <Divider />
+        <Txt variant="heading" accessibilityRole="header">
+          {t('term.scorekeeper')}
+        </Txt>
+        <Txt variant="small" muted>
+          {t('settings.scorekeeper.hint')}
+        </Txt>
+        <TextField
+          value={scorekeeper}
+          // Saved as typed, so leaving the screen with the keyboard still up keeps it.
+          onChangeText={async (text) => {
+            setScorekeeper(text);
+            await (await getRepo()).setSetting(SCOREKEEPER_KEY, cleanOfficial(text));
+          }}
+          onEndEditing={() => setScorekeeper((v) => cleanOfficial(v))}
+          maxLength={MAX_OFFICIAL_LENGTH}
+          placeholder={t('settings.scorekeeper.placeholder')}
+          autoCapitalize="words"
+          autoCorrect={false}
+          returnKeyType="done"
+          accessibilityLabel={t('term.scorekeeper')}
+        />
 
         <Divider />
         <Txt variant="heading" accessibilityRole="header">

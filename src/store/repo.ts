@@ -293,6 +293,9 @@ export type Repo = ReturnType<typeof createRepo>;
 export const AUTO_POINT_KEY = 'autoPoint';
 export const parseAutoPoint = (v: string | null): boolean => v !== 'off';
 
+/** The scorekeeper name filled into games that have none yet; empty or missing means none. */
+export const SCOREKEEPER_KEY = 'scorekeeperName';
+
 type GameSql = {
   server_id: number;
   game_id: number;

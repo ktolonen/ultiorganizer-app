@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Button, Txt } from '../ui/components';
+import { Button, TextField, Txt } from '../ui/components';
 import { useTheme } from '../ui/theme';
 import { FONTS, SIZE, SPACE, TARGET, TEAM_SWATCHES, readableOn } from '../ui/tokens';
 import { back, initialPicker, pick, stepOf, toggleCallahan } from './goalPicker';
-import type { GameState } from './reducer';
+import { cleanOfficial, MAX_OFFICIAL_LENGTH, type GameState } from './reducer';
 import type { RosterEntry, Side } from './types';
 
 const nameOf = (state: GameState, side: Side, id: number | null): string => {
@@ -480,6 +480,45 @@ export function ColorPicker({
           </View>
         );
       })}
+    </View>
+  );
+}
+
+/**
+ * The game's scorekeeper name, saved when editing ends. Remount it with `key={value}` so a
+ * change from elsewhere (the server version kept after a conflict) replaces the draft.
+ */
+export function ScorekeeperField({
+  value,
+  disabled,
+  onSave,
+}: {
+  value: string | null;
+  disabled?: boolean;
+  onSave: (name: string | null) => void;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(value ?? '');
+  const save = () => {
+    const name = cleanOfficial(draft);
+    setDraft(name);
+    if (name !== (value ?? '')) onSave(name || null);
+  };
+  return (
+    <View style={{ gap: 4 }}>
+      <Txt muted>{t('term.scorekeeper')}</Txt>
+      <TextField
+        value={draft}
+        onChangeText={setDraft}
+        onEndEditing={save}
+        editable={!disabled}
+        maxLength={MAX_OFFICIAL_LENGTH}
+        placeholder={t('game.scorekeeperPlaceholder')}
+        autoCapitalize="words"
+        autoCorrect={false}
+        returnKeyType="done"
+        accessibilityLabel={t('term.scorekeeper')}
+      />
     </View>
   );
 }
