@@ -1,4 +1,5 @@
-import { DAY, NIGHT, TEAM_SWATCHES, contrastRatio, defaultTeamColors, readableOn } from './tokens';
+import { LIGHT, DARK, TEAM_SWATCHES, contrastRatio, defaultTeamColors, readableOn } from './tokens';
+import { parseThemeMode } from './theme';
 
 describe('contrast', () => {
   it('computes the WCAG ratio', () => {
@@ -6,20 +7,20 @@ describe('contrast', () => {
     expect(contrastRatio('#777777', '#777777')).toBe(1);
   });
   it.each([
-    ['day', DAY],
-    ['night', NIGHT],
+    ['light', LIGHT],
+    ['dark', DARK],
   ])('%s: ink is at least 15:1 and muted at least 7:1 on the surface', (_n, p) => {
     expect(contrastRatio(p.ink, p.surface)).toBeGreaterThanOrEqual(15);
     expect(contrastRatio(p.muted, p.surface)).toBeGreaterThanOrEqual(7);
   });
   it('uses true white and true black surfaces', () => {
-    expect(DAY.surface).toBe('#FFFFFF');
-    expect(NIGHT.surface).toBe('#000000');
+    expect(LIGHT.surface).toBe('#FFFFFF');
+    expect(DARK.surface).toBe('#000000');
   });
   it('text on a signal-colour fill reads at 4.5:1 or better', () => {
     // The bar is a fill with its signal text on it, never a thin graphic on the surface:
-    // day warn (#E8A200) is only 2.2:1 against white, so it must not be used as a line or icon.
-    for (const p of [DAY, NIGHT]) {
+    // light warn (#E8A200) is only 2.2:1 against white, so it must not be used as a line or icon.
+    for (const p of [LIGHT, DARK]) {
       for (const c of [p.signalGo, p.signalWarn, p.signalStop]) {
         expect(contrastRatio(c, readableOn(c))).toBeGreaterThanOrEqual(4.5);
       }
@@ -40,5 +41,16 @@ describe('defaultTeamColors', () => {
       expect(c.home).not.toBe(c.away);
       expect(defaultTeamColors(id)).toEqual(c);
     }
+  });
+});
+
+describe('parseThemeMode', () => {
+  it('reads light, dark and the older day/night names, defaulting to system', () => {
+    expect(parseThemeMode('light')).toBe('light');
+    expect(parseThemeMode('dark')).toBe('dark');
+    expect(parseThemeMode('day')).toBe('light');
+    expect(parseThemeMode('night')).toBe('dark');
+    expect(parseThemeMode(null)).toBe('system');
+    expect(parseThemeMode('sunset')).toBe('system');
   });
 });

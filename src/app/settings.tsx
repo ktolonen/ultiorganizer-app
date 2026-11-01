@@ -8,7 +8,7 @@ import { getRepo } from '../store/sqlite';
 import { Button, Divider, layout, Screen, TextField, Txt } from '../ui/components';
 import { useThemeMode, type ThemeMode } from '../ui/theme';
 
-const MODES: ThemeMode[] = ['system', 'day', 'night'];
+const MODES: ThemeMode[] = ['system', 'light', 'dark'];
 
 export default function Settings() {
   const { t } = useTranslation();

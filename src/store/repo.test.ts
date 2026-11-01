@@ -259,9 +259,9 @@ describe('timekeeper and settings', () => {
   it('stores settings', async () => {
     const { repo } = await fresh();
     expect(await repo.getSetting('theme')).toBeNull();
-    await repo.setSetting('theme', 'night');
-    await repo.setSetting('theme', 'day');
-    expect(await repo.getSetting('theme')).toBe('day');
+    await repo.setSetting('theme', 'dark');
+    await repo.setSetting('theme', 'light');
+    expect(await repo.getSetting('theme')).toBe('light');
   });
 });
 

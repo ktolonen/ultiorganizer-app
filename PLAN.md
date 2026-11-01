@@ -131,7 +131,7 @@ Used outdoors, in direct sun or under floodlights, one-handed, often while runni
 
 ### Tokens
 
-| Token | Day | Night | Role |
+| Token | Light | Dark | Role |
 | --- | --- | --- | --- |
 | `surface` | `#FFFFFF` | `#000000` | true white and true black, the most contrast for glare and OLED |
 | `ink` | `#0A1620` | `#F2F5F7` | text, 15:1+ on surface |
@@ -142,7 +142,7 @@ Used outdoors, in direct sun or under floodlights, one-handed, often while runni
 
 Team colours are the one bold move. Each side gets a colour picked from a set of 12 jersey-like swatches when the game opens; light and dark are allowed, and text colour flips automatically to keep 7:1 contrast. The two halves of the live screen are flooded with those colours, so the scorekeeper sees the field, not an interface. Everything else stays neutral.
 
-Theme: Day, Night, or follow the system (the default). No sunset-based auto mode: that would need location permission for a cosmetic feature.
+Theme: Light, Dark, or follow the system (the default). No sunset-based auto mode: that would need location permission for a cosmetic feature.
 
 ### Type
 
@@ -206,6 +206,6 @@ The app stores player names and numbers for the games it opened. Local game data
 
 ## Verification per phase
 
-- App: `tsc --noEmit`, lint, Jest, and Maestro on both platforms. Screenshots of every screen in Day and Night, phone and tablet, en and fi (longest strings: de).
+- App: `tsc --noEmit`, lint, Jest, and Maestro on both platforms. Screenshots of every screen in Light and Dark, phone and tablet, en and fi (longest strings: de).
 - Server (S0–S2): the `ultiorganizer` rules in `AGENTS.md`: `composer check`, DB-access checker, user-language review, screenshot-verify of `admin/apitokens.php`, harness cases, `./test:matrix`.
 - End to end: a full game against the dev stack, then the result and scoresheet checked on the website, and the history rows showing source `api` with the app token.

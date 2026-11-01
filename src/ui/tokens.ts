@@ -11,7 +11,7 @@ export type Palette = {
   muted: string;
 };
 
-export const DAY: Palette = {
+export const LIGHT: Palette = {
   surface: '#FFFFFF',
   ink: '#0A1620',
   line: '#C9D2D9',
@@ -21,7 +21,7 @@ export const DAY: Palette = {
   muted: '#3C4A56',
 };
 
-export const NIGHT: Palette = {
+export const DARK: Palette = {
   surface: '#000000',
   ink: '#F2F5F7',
   line: '#2A3640',
