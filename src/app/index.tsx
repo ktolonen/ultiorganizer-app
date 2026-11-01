@@ -2,8 +2,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { deleteLinkToken } from '../store/secure';
-import type { Repo, ServerRow } from '../store/repo';
+import { formatDay, formatDayTime } from '../services/links';
+import { usePendingLink } from '../services/pending';
+import { deleteLinkToken, deleteSavedLinkToken, getSavedLinkToken } from '../store/secure';
+import type { LinkRow, Repo, ServerRow } from '../store/repo';
 import { getRepo } from '../store/sqlite';
 import { Button, Divider, layout, Screen, Txt } from '../ui/components';
 import { useTheme } from '../ui/theme';
@@ -12,16 +14,19 @@ import { SPACE, TARGET } from '../ui/tokens';
 type RecentGame = Awaited<ReturnType<Repo['listGames']>>[number];
 
 export default function Home() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { palette } = useTheme();
+  const setPending = usePendingLink((s) => s.set);
   const [servers, setServers] = useState<ServerRow[] | null>(null);
   const [games, setGames] = useState<RecentGame[]>([]);
+  const [links, setLinks] = useState<LinkRow[]>([]);
 
   const load = useCallback(async () => {
     const repo = await getRepo();
     setServers(await repo.listServers());
     setGames(await repo.listGames());
+    setLinks(await repo.listLinks());
   }, []);
   useFocusEffect(
     useCallback(() => {
@@ -49,6 +54,24 @@ export default function Home() {
 
   const serverLabel = (id: number) => servers?.find((s) => s.id === id)?.label ?? '';
 
+  // A saved link reopens its game list without the camera; the token never enters the route.
+  const openLink = async (l: LinkRow) => {
+    const linkToken = await getSavedLinkToken(l.id);
+    if (!linkToken) return removeLink(l);
+    setPending({ serverId: l.serverId, linkToken });
+    router.push('/games');
+  };
+
+  // Nothing is lost by forgetting a link: its games stay, and the QR can be scanned again.
+  const removeLink = async (l: LinkRow) => {
+    const repo = await getRepo();
+    await repo.deleteLink(l.id);
+    await deleteSavedLinkToken(l.id);
+    await load();
+  };
+
+  const linkTitle = (l: LinkRow) => l.label || t('home.linkUnnamed');
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={layout.scroll}>
@@ -75,6 +98,45 @@ export default function Home() {
           onPress={() => router.push('/timekeeper')}
         />
 
+        {links.length > 0 && (
+          <>
+            <Divider />
+            <Txt variant="heading" accessibilityRole="header">
+              {t('home.links')}
+            </Txt>
+            {links.map((l) => (
+              <View key={l.id} style={[styles.card, { borderColor: palette.line }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={[linkTitle(l), formatDay(l.day, i18n.language)]
+                    .filter(Boolean)
+                    .join(', ')}
+                  accessibilityHint={t('home.linkHint')}
+                  onPress={() => void openLink(l)}
+                  style={({ pressed }) => [styles.cardMain, { opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <Txt variant="heading">{linkTitle(l)}</Txt>
+                  <Txt variant="small" muted>
+                    {[formatDay(l.day, i18n.language), serverLabel(l.serverId)]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Txt>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('home.linkRemove')}: ${linkTitle(l)}`}
+                  onPress={() => void removeLink(l)}
+                  style={({ pressed }) => [styles.cardDelete, { opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <Txt variant="small" style={{ color: palette.signalStop }}>
+                    {t('home.linkRemoveShort')}
+                  </Txt>
+                </Pressable>
+              </View>
+            ))}
+          </>
+        )}
+
         <Divider />
         <Txt variant="heading" accessibilityRole="header">
           {t('home.recent')}
@@ -93,7 +155,9 @@ export default function Home() {
             >
               <Txt variant="heading">{g.title}</Txt>
               <Txt variant="small" muted>
-                {serverLabel(g.serverId)}
+                {[formatDayTime(g.time, i18n.language), serverLabel(g.serverId)]
+                  .filter(Boolean)
+                  .join(' · ')}
                 {' · '}
                 <Txt
                   variant="small"

@@ -5,7 +5,14 @@ import { newOutbox } from '../sync/outbox';
 import { newSession, startClock } from '../timekeeper/engine';
 import { BUNDLED_TEMPLATES } from '../timekeeper/templates';
 import { type Db, MIGRATIONS, migrate } from './migrations';
-import { RETENTION_MS, STANDALONE_SCOPE, createRepo, gameScope, parseAutoPoint } from './repo';
+import {
+  LINK_RETENTION_MS,
+  RETENTION_MS,
+  STANDALONE_SCOPE,
+  createRepo,
+  gameScope,
+  parseAutoPoint,
+} from './repo';
 
 /** Adapts node:sqlite (real SQL, in memory) to the app's Db interface. */
 function memoryDb(): Db {
@@ -263,5 +270,54 @@ describe('auto point setting', () => {
     expect(parseAutoPoint(null)).toBe(true);
     expect(parseAutoPoint('on')).toBe(true);
     expect(parseAutoPoint('off')).toBe(false);
+  });
+});
+
+describe('saved links', () => {
+  it('lists newest first, updates in place and cascades with the server', async () => {
+    const { repo } = await fresh();
+    const s = await repo.upsertServer('https://a.org', 'A', NOW);
+    const a = await repo.insertLink({ serverId: s.id, label: 'Field 1', day: null, now: NOW });
+    const b = await repo.insertLink({ serverId: s.id, label: 'Field 2', day: null, now: NOW + 1 });
+    expect((await repo.listLinks()).map((l) => l.id)).toEqual([b, a]);
+    await repo.updateLink(a, { label: 'Field 1, Field 4', day: '2026-11-01', now: NOW + 2 });
+    expect((await repo.listLinks(s.id))[0]).toEqual({
+      id: a,
+      serverId: s.id,
+      label: 'Field 1, Field 4',
+      day: '2026-11-01',
+      usedAt: NOW + 2,
+    });
+    await repo.removeServer(s.id);
+    expect(await repo.listLinks()).toEqual([]);
+  });
+  it('purges links not opened for a week', async () => {
+    const { repo } = await fresh();
+    const s = await repo.upsertServer('https://a.org', 'A', NOW);
+    const old = await repo.insertLink({
+      serverId: s.id,
+      label: '',
+      day: null,
+      now: NOW - LINK_RETENTION_MS - 1,
+    });
+    const recent = await repo.insertLink({ serverId: s.id, label: '', day: null, now: NOW - 1 });
+    // Scanned long ago, but its game day is still ahead.
+    const ahead = await repo.insertLink({
+      serverId: s.id,
+      label: '',
+      day: new Date(NOW + 3 * 86_400_000).toISOString().slice(0, 10),
+      now: NOW - LINK_RETENTION_MS * 3,
+    });
+    expect(await repo.purgeOldLinks(NOW)).toEqual([old]);
+    expect((await repo.listLinks()).map((l) => l.id).sort()).toEqual([recent, ahead].sort());
+  });
+});
+
+describe('game times', () => {
+  it('lists the scheduled time from the stored entry context', async () => {
+    const { repo } = await fresh();
+    const s = await repo.upsertServer('https://a.org', 'A', NOW);
+    await repo.saveGame(gameInput(s.id));
+    expect((await repo.listGames())[0].time).toBe('2026-06-01 10:00:00');
   });
 });

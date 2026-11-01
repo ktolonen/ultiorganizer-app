@@ -4,13 +4,22 @@ import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { DiscoveredGame, Discovery } from '../api/http';
 import { groupByField } from '../services/games';
+import {
+  formatClock,
+  formatDay,
+  formatDayTime,
+  rememberLink,
+  shouldRemember,
+} from '../services/links';
 import { usePendingLink } from '../services/pending';
 import { loadGameList, openFromLink } from '../services/session';
+import { getSavedLinkToken, saveSavedLinkToken } from '../store/secure';
+import { getRepo } from '../store/sqlite';
 import { Button, layout, Screen, Txt } from '../ui/components';
 import { useTheme } from '../ui/theme';
 
 export default function Games() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { palette } = useTheme();
   const link = usePendingLink((s) => s.link);
@@ -26,7 +35,25 @@ export default function Games() {
     void loadGameList(link).then((res) => {
       if (!live) return;
       setLoading(false);
-      if (res.ok) return setData(res.data);
+      if (res.ok) {
+        setData(res.data);
+        // Keep a field link on Home so its games reopen without another scan.
+        if (shouldRemember(res.data)) {
+          getRepo()
+            .then((repo) =>
+              rememberLink({
+                repo,
+                ...link,
+                data: res.data,
+                getToken: getSavedLinkToken,
+                saveToken: saveSavedLinkToken,
+                now: Date.now(),
+              }),
+            )
+            .catch(() => undefined);
+        }
+        return;
+      }
       setError(
         res.kind === 'http'
           ? t('games.error.http', { code: res.code })
@@ -58,6 +85,15 @@ export default function Games() {
   };
 
   const groups = useMemo(() => groupByField(data?.games ?? []), [data]);
+  // One day: show it once under the title. Several: each game shows its own day.
+  const days = useMemo(
+    () => [
+      ...new Set((data?.games ?? []).map((g) => formatDay(g.time, i18n.language)).filter(Boolean)),
+    ],
+    [data, i18n.language],
+  );
+  const when = (g: DiscoveredGame) =>
+    days.length > 1 ? formatDayTime(g.time, i18n.language) : formatClock(g.time);
   const resultText = (g: DiscoveredGame) =>
     g.result.state === 'not_started'
       ? t('games.notStarted')
@@ -69,6 +105,7 @@ export default function Games() {
         <Txt variant="title" accessibilityRole="header">
           {t('games.title')}
         </Txt>
+        {days.length === 1 && <Txt muted>{days[0]}</Txt>}
         {loading && <Txt muted>…</Txt>}
         {error && (
           <>
@@ -81,7 +118,9 @@ export default function Games() {
         {data && data.games.length === 0 && (
           <Txt>
             {data.available_from
-              ? t('games.opensOn', { date: data.available_from })
+              ? t('games.opensOn', {
+                  date: formatDay(data.available_from, i18n.language) || data.available_from,
+                })
               : t('games.empty')}
           </Txt>
         )}
@@ -93,7 +132,7 @@ export default function Games() {
                 key={g.game_id}
                 kind="secondary"
                 disabled={opening !== null}
-                label={`${(g.time ?? '').slice(11, 16)}  ${g.home.name ?? '?'} – ${g.away.name ?? '?'}`}
+                label={`${when(g)}  ${g.home.name ?? '?'} – ${g.away.name ?? '?'}`}
                 hint={resultText(g)}
                 onPress={() => void open(g)}
               />

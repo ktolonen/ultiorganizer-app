@@ -22,6 +22,34 @@ export const gameScope = (serverId: number, gameId: number) => `game:${serverId}
 /** Local game data is deleted this long after a game is finalized and synced. */
 export const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
+/** A saved scorekeeping link is forgotten after this long without being opened. */
+export const LINK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type LinkRow = {
+  id: number;
+  serverId: number;
+  /** Fields the link covers, e.g. `Field 3`; empty when the server gave none. */
+  label: string;
+  /** `YYYY-MM-DD` of its first game, or the day it opens; null when unknown. */
+  day: string | null;
+  usedAt: number;
+};
+
+type LinkSql = {
+  id: number;
+  server_id: number;
+  label: string;
+  day: string | null;
+  used_at: number;
+};
+const toLink = (r: LinkSql): LinkRow => ({
+  id: r.id,
+  serverId: r.server_id,
+  label: r.label,
+  day: r.day,
+  usedAt: r.used_at,
+});
+
 export type ServerRow = {
   id: number;
   root: string;
@@ -178,9 +206,10 @@ export function createRepo(db: Db) {
           | 'synced_at'
           | 'updated_at'
           | 'outbox_json'
-        >
+        > & { time: string | null }
       >(
-        `SELECT server_id, game_id, title, finalized_at, synced_at, updated_at, outbox_json FROM games
+        `SELECT server_id, game_id, title, finalized_at, synced_at, updated_at, outbox_json,
+                json_extract(context_json, '$.game.time') AS time FROM games
          ${serverId === undefined ? '' : 'WHERE server_id = ?'} ORDER BY updated_at DESC`,
         ...(serverId === undefined ? [] : [serverId]),
       );
@@ -190,6 +219,8 @@ export function createRepo(db: Db) {
           serverId: r.server_id,
           gameId: r.game_id,
           title: r.title,
+          /** Scheduled start as the server gave it (`YYYY-MM-DD HH:MM:SS`, event local). */
+          time: typeof r.time === 'string' ? r.time : null,
           finalizedAt: r.finalized_at,
           syncedAt: r.synced_at,
           updatedAt: r.updated_at,
@@ -218,6 +249,64 @@ export function createRepo(db: Db) {
       );
       for (const g of old) await this.deleteGame(g.server_id, g.game_id);
       return old.map((g) => ({ serverId: g.server_id, gameId: g.game_id }));
+    },
+
+    /* Saved links --------------------------------------------------- */
+
+    async listLinks(serverId?: number): Promise<LinkRow[]> {
+      const rows = await db.getAllAsync<LinkSql>(
+        `SELECT * FROM links ${serverId === undefined ? '' : 'WHERE server_id = ?'}
+         ORDER BY used_at DESC, id DESC`,
+        ...(serverId === undefined ? [] : [serverId]),
+      );
+      return rows.map(toLink);
+    },
+
+    async insertLink(l: {
+      serverId: number;
+      label: string;
+      day: string | null;
+      now: number;
+    }): Promise<number> {
+      await db.runAsync(
+        'INSERT INTO links (server_id, label, day, used_at) VALUES (?, ?, ?, ?)',
+        l.serverId,
+        l.label,
+        l.day,
+        l.now,
+      );
+      const r = await db.getFirstAsync<{ id: number }>('SELECT last_insert_rowid() AS id');
+      return r!.id;
+    },
+
+    async updateLink(id: number, l: { label: string; day: string | null; now: number }) {
+      await db.runAsync(
+        'UPDATE links SET label = ?, day = ?, used_at = ? WHERE id = ?',
+        l.label,
+        l.day,
+        l.now,
+        id,
+      );
+    },
+
+    async deleteLink(id: number): Promise<void> {
+      await db.runAsync('DELETE FROM links WHERE id = ?', id);
+    },
+
+    /**
+     * Deletes links neither opened nor in use for a week: a link scanned well before its
+     * game day is kept until a week after that day. Returns their ids so the caller can
+     * delete the tokens.
+     */
+    async purgeOldLinks(now: number): Promise<number[]> {
+      const cutoff = now - LINK_RETENTION_MS;
+      const old = await db.getAllAsync<{ id: number }>(
+        'SELECT id FROM links WHERE used_at < ? AND (day IS NULL OR day < ?)',
+        cutoff,
+        new Date(cutoff).toISOString().slice(0, 10),
+      );
+      for (const l of old) await this.deleteLink(l.id);
+      return old.map((l) => l.id);
     },
 
     /* Timekeeper ---------------------------------------------------- */

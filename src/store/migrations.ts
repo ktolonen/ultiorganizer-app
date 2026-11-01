@@ -40,6 +40,15 @@ export const MIGRATIONS: readonly string[] = [
      key TEXT PRIMARY KEY,
      value TEXT NOT NULL
    );`,
+  // Scorekeeping links kept for reopening their game list without a scan. The link
+  // token itself is in SecureStore under the row id.
+  `CREATE TABLE links (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     server_id INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+     label TEXT NOT NULL,
+     day TEXT,
+     used_at INTEGER NOT NULL
+   );`,
 ];
 
 /** The minimal database surface the store needs; `expo-sqlite` and test fakes both fit. */

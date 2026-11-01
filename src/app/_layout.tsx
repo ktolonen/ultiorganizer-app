@@ -10,7 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { initI18n } from '../i18n';
-import { deleteLinkToken } from '../store/secure';
+import { deleteLinkToken, deleteSavedLinkToken } from '../store/secure';
 import { getRepo } from '../store/sqlite';
 import { parseThemeMode, useTheme, useThemeMode } from '../ui/theme';
 import { FONTS } from '../ui/tokens';
@@ -41,6 +41,7 @@ export default function RootLayout() {
         for (const g of await repo.purgeOldGames(Date.now())) {
           await deleteLinkToken(g.serverId, g.gameId);
         }
+        for (const id of await repo.purgeOldLinks(Date.now())) await deleteSavedLinkToken(id);
       } finally {
         if (live) setReady(true);
       }

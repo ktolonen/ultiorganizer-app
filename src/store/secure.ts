@@ -6,6 +6,7 @@ import * as SecureStore from 'expo-secure-store';
  */
 const appKey = (serverId: number) => `app-token.${serverId}`;
 const linkKey = (serverId: number, gameId: number) => `link-token.${serverId}.${gameId}`;
+const savedLinkKey = (linkId: number) => `saved-link.${linkId}`;
 const options: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
 };
@@ -23,3 +24,11 @@ export const getLinkToken = (serverId: number, gameId: number) =>
   SecureStore.getItemAsync(linkKey(serverId, gameId), options);
 export const deleteLinkToken = (serverId: number, gameId: number) =>
   SecureStore.deleteItemAsync(linkKey(serverId, gameId), options);
+
+/** The token of a saved link (the `links` table row id), kept to reopen its game list. */
+export const saveSavedLinkToken = (linkId: number, token: string) =>
+  SecureStore.setItemAsync(savedLinkKey(linkId), token, options);
+export const getSavedLinkToken = (linkId: number) =>
+  SecureStore.getItemAsync(savedLinkKey(linkId), options);
+export const deleteSavedLinkToken = (linkId: number) =>
+  SecureStore.deleteItemAsync(savedLinkKey(linkId), options);
