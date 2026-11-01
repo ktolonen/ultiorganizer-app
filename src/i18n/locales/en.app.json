@@ -5,6 +5,7 @@
   "home.timekeeper": "Timekeeper only",
   "home.pair": "Pair a server",
   "home.servers": "Paired servers",
+  "home.serversLine": "Paired: {{list}}",
   "home.recent": "Recent games",
   "home.recentEmpty": "Games you open show up here.",
   "home.links": "Field links",

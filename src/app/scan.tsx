@@ -37,7 +37,8 @@ export default function Scan() {
         // The setup QR is read only here, never through a system deep link.
         const r = await pairServer(code.value, { repo, saveToken: saveAppToken, qr: QR_OPTIONS });
         if (!r.ok) return setNotice({ message: t(pairErrorKey(r.error)) });
-        router.replace('/');
+        // Home confirms the pairing, so the jump back from the camera is not a mystery.
+        router.replace({ pathname: '/', params: { paired: r.server.label } });
         return;
       }
       const server = await repo.serverByRoot(code.value.root);

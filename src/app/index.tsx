@@ -1,5 +1,5 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { formatDay, formatDayTime } from '../services/links';
@@ -21,6 +21,13 @@ export default function Home() {
   const [servers, setServers] = useState<ServerRow[] | null>(null);
   const [games, setGames] = useState<RecentGame[]>([]);
   const [links, setLinks] = useState<LinkRow[]>([]);
+  // Set by the scanner after a setup QR: shown until Home is left, then dropped from the route.
+  const { paired } = useLocalSearchParams<{ paired?: string }>();
+  const [pairedNotice, setPairedNotice] = useState<string | null>(null);
+  if (paired && paired !== pairedNotice) setPairedNotice(paired);
+  useEffect(() => {
+    if (paired) router.setParams({ paired: undefined });
+  }, [paired, router]);
 
   const load = useCallback(async () => {
     const repo = await getRepo();
@@ -31,6 +38,7 @@ export default function Home() {
   useFocusEffect(
     useCallback(() => {
       void load();
+      return () => setPairedNotice(null);
     }, [load]),
   );
 
@@ -90,7 +98,17 @@ export default function Home() {
           </Pressable>
         </View>
 
+        {pairedNotice && (
+          <Txt accessibilityRole="alert" style={{ color: palette.signalGo }}>
+            {t('pair.saved', { label: pairedNotice })}
+          </Txt>
+        )}
         {servers?.length === 0 && <Txt muted>{t('home.noServers')}</Txt>}
+        {!!servers?.length && (
+          <Txt variant="small" muted>
+            {t('home.serversLine', { list: servers.map((s) => s.label).join(', ') })}
+          </Txt>
+        )}
         <Button label={t('home.scan')} onPress={() => router.push('/scan')} />
         <Button
           label={t('home.timekeeper')}
