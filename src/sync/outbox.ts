@@ -44,6 +44,7 @@ export type OutboxRow = {
   createdAt: number;
   /** Set when sent. */
   serverNum?: number;
+  /** The refusal of a failed row, or the last server error of a row still being retried. */
   error?: { status: number; code: string; path?: string; message: string };
 };
 
@@ -85,6 +86,8 @@ export function newOutbox(
 export const FALL_BEHIND_ROWS = 10;
 export const BACKOFF_BASE_MS = 1000;
 export const BACKOFF_MAX_MS = 30_000;
+/** Failed attempts in a row on server errors before the status says so instead of "queued". */
+export const SERVER_ERROR_ATTEMPTS = 3;
 
 export const backoffMs = (attempts: number): number =>
   Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** Math.max(0, attempts - 1));
@@ -304,8 +307,10 @@ export function onResponse(
 ): OutboxState {
   const row = state.rows.find((r) => r.key === key);
   if (!row) return state;
-  const retry = (delayMs: number, offline: boolean): OutboxState => ({
-    ...update(state, key, (r) => ({ ...r, status: 'pending' })),
+  // A server error is kept on the row, so the status can show it while retries go on.
+  // A network failure clears it: what the server would answer now is unknown.
+  const retry = (delayMs: number, offline: boolean, error?: OutboxRow['error']): OutboxState => ({
+    ...update(state, key, (r) => ({ ...r, status: 'pending', error })),
     nextAttemptAt: now + delayMs,
     offline,
   });
@@ -315,6 +320,7 @@ export function onResponse(
       ...r,
       status: 'sent',
       serverNum: res.goalNum ?? r.serverNum,
+      error: undefined,
     }));
     return {
       ...s,
@@ -327,12 +333,13 @@ export function onResponse(
   if (res.kind === 'network') return retry(backoffMs(row.attempts), true);
 
   const { status, code } = res;
+  const serverError = { status, code, path: res.path, message: res.message ?? code };
   if (status === 429 || status === 503) {
     const wait =
       res.retryAfterSec !== undefined ? res.retryAfterSec * 1000 : backoffMs(row.attempts);
-    return retry(wait, false);
+    return retry(wait, false, serverError);
   }
-  if (status >= 500) return retry(backoffMs(row.attempts), false);
+  if (status >= 500) return retry(backoffMs(row.attempts), false, serverError);
   if (status === 409 && CONFLICT_CODES.has(code)) {
     return {
       ...update(state, key, (r) => ({ ...r, status: 'pending' })),
@@ -494,6 +501,8 @@ export type SyncStatus =
   | { kind: 'synced' }
   | { kind: 'sending' }
   | { kind: 'offline'; queued: number }
+  /** The server keeps failing the next row; retries go on, nothing is lost. */
+  | { kind: 'server_error'; queued: number; status: number }
   | { kind: 'attention'; reason: PauseReason }
   | { kind: 'queued'; queued: number };
 
@@ -506,6 +515,11 @@ export function syncStatus(state: OutboxState): SyncStatus {
   if (state.paused) return { kind: 'attention', reason: state.paused.reason };
   const unsent = unsentRows(state);
   if (state.offline && unsent.length) return { kind: 'offline', queued: unsent.length };
+  // Checked before "sending", so each retry does not flicker the status away from the error.
+  const head = unsent[0];
+  if (head?.error && head.status !== 'failed' && head.attempts >= SERVER_ERROR_ATTEMPTS) {
+    return { kind: 'server_error', queued: unsent.length, status: head.error.status };
+  }
   if (hasInFlight(state)) return { kind: 'sending' };
   if (unsent.length) return { kind: 'queued', queued: unsent.length };
   return { kind: 'synced' };

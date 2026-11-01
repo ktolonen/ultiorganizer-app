@@ -85,6 +85,7 @@
   "sync.sending": "Sending",
   "sync.offline": "Offline, {{count}} queued",
   "sync.queued": "{{count}} queued",
+  "sync.serverError": "Server error, {{count}} queued",
   "sync.attention": "Needs attention",
   "game.score": "{{team}}, {{points}} points, {{timeouts}} timeouts left",
   "game.timeouts": "TO",

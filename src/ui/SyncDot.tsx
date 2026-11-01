@@ -12,6 +12,8 @@ export function syncLabelKey(s: SyncStatus): { key: string; count?: number } {
       return { key: 'sync.sending' };
     case 'offline':
       return { key: 'sync.offline', count: s.queued };
+    case 'server_error':
+      return { key: 'sync.serverError', count: s.queued };
     case 'queued':
       return { key: 'sync.queued', count: s.queued };
     case 'attention':
@@ -19,14 +21,14 @@ export function syncLabelKey(s: SyncStatus): { key: string; count?: number } {
   }
 }
 
-/** The small dot in the game header: synced / sending / offline with N queued / needs attention. */
+/** The small dot in the game header: synced / sending / offline or server error with N queued / needs attention. */
 export function SyncDot({ status }: { status: SyncStatus }) {
   const { palette } = useTheme();
   const { t } = useTranslation();
   const color =
     status.kind === 'synced'
       ? palette.signalGo
-      : status.kind === 'attention'
+      : status.kind === 'attention' || status.kind === 'server_error'
         ? palette.signalStop
         : palette.signalWarn;
   const { key, count } = syncLabelKey(status);

@@ -2,6 +2,7 @@ import type { GameEvent } from '../game/reducer';
 import type { GameDataDocument } from '../game/upload';
 import {
   BACKOFF_MAX_MS,
+  SERVER_ERROR_ATTEMPTS,
   type OutboxState,
   backoffMs,
   discardFailed,
@@ -160,6 +161,40 @@ describe('sending', () => {
     const s = step(add(fresh(), goalEv(1)), { kind: 'http', status: 500, code: 'internal' }).state;
     expect(s.paused).toBeNull();
     expect(s.rows[0].status).toBe('pending');
+  });
+
+  it('shows repeated server errors while retrying, and clears them once a send lands', () => {
+    const fail = { kind: 'http', status: 500, code: 'internal' } as const;
+    let s = add(add(fresh(), goalEv(1)), goalEv(2));
+    for (let i = 1; i < SERVER_ERROR_ATTEMPTS; i++) {
+      s = step(s, fail, 0).state;
+      s = { ...s, nextAttemptAt: 0 };
+      expect(syncStatus(s)).toEqual({ kind: 'queued', queued: 2 });
+    }
+    s = step(s, fail, 0).state;
+    s = { ...s, nextAttemptAt: 0 };
+    expect(s.paused).toBeNull();
+    expect(s.rows[0].error).toMatchObject({ status: 500, code: 'internal' });
+    expect(syncStatus(s)).toEqual({ kind: 'server_error', queued: 2, status: 500 });
+    // The next retry is in flight: the status keeps showing the error, not "sending".
+    s = markSending(s, 'key-1');
+    expect(syncStatus(s)).toEqual({ kind: 'server_error', queued: 2, status: 500 });
+    s = onResponse(s, 'key-1', ok('tok1'), 0);
+    expect(s.rows[0].error).toBeUndefined();
+    expect(syncStatus(s)).toEqual({ kind: 'queued', queued: 1 });
+  });
+
+  it('forgets a server error after a network failure', () => {
+    let s = add(fresh(), goalEv(1));
+    for (let i = 0; i < SERVER_ERROR_ATTEMPTS; i++) {
+      s = {
+        ...step(s, { kind: 'http', status: 502, code: 'bad_gateway' }, 0).state,
+        nextAttemptAt: 0,
+      };
+    }
+    s = step(s, { kind: 'network' }, 0).state;
+    expect(s.rows[0].error).toBeUndefined();
+    expect(syncStatus(s)).toEqual({ kind: 'offline', queued: 1 });
   });
 
   it('reuses the key after a crash while sending', () => {
