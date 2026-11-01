@@ -19,6 +19,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     bundleIdentifier: isDev ? 'org.ultiorganizer.field.dev' : 'org.ultiorganizer.field',
     supportsTablet: true,
+    // Only standard https (exempt), so TestFlight skips the export compliance prompt.
+    config: { usesNonExemptEncryption: false },
     infoPlist: {
       NSCameraUsageDescription: 'The camera scans the scorekeeping and setup QR codes.',
       ...(isDev ? { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } } : {}),
