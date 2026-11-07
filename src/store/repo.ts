@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { GameState } from '../game/reducer';
+import { capsFromContext, type GameState } from '../game/reducer';
 import { type EntryContext, entryContextSchema } from '../game/types';
 import type { OutboxState } from '../sync/outbox';
 import { newSession, type TimekeeperSession } from '../timekeeper/engine';
@@ -186,7 +186,8 @@ export function createRepo(db: Db) {
       return {
         title: r.title,
         context,
-        state,
+        // Games stored before caps were kept read them from the stored entry context.
+        state: state.caps ? state : { ...state, caps: capsFromContext(context) },
         outbox,
         colors: parseJson(r.colors_json, teamColorsSchema),
         finalizedAt: r.finalized_at,

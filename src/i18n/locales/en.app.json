@@ -143,5 +143,14 @@
   "error.no_token": "The game has not been read from the server yet.",
   "home.deleteConfirm": "Delete this game from the phone?",
   "home.deleteUnsent": "{{count}} entries have not been sent to the server. Deleting the game loses them.",
-  "pair.error.rejected": "The server did not accept this token."
+  "pair.error.rejected": "The server did not accept this token.",
+  "common.save": "Save",
+  "game.recordCap": "Record cap",
+  "game.capCalledAt": "{{cap}} called at",
+  "game.capLine": "{{time}}, point cap {{points}}",
+  "game.capNone": "Not recorded",
+  "game.capsLocal": "This server does not store caps yet, so they are kept on this phone only.",
+  "error.times_hidden": "Caps are not recorded while the event hides times.",
+  "error.point_cap_too_low": "A new point cap must be greater than the current score.",
+  "game.capEdit": "Change or remove"
 }

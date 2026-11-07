@@ -321,3 +321,17 @@ describe('game times', () => {
     expect((await repo.listGames())[0].time).toBe('2026-06-01 10:00:00');
   });
 });
+
+describe('caps in stored games', () => {
+  it('reads caps from the stored entry context for a game saved before caps were kept', async () => {
+    const { repo } = await fresh();
+    const s = await repo.upsertServer('https://a.org', 'A', NOW);
+    const input = gameInput(s.id);
+    input.context.retained.cap_events = [{ type: 'half_cap', time: 1500, point_cap: 8 }];
+    const { caps: _dropped, ...old } = input.state;
+    await repo.saveGame({ ...input, state: old as typeof input.state });
+    expect((await repo.loadGame(s.id, 123))?.state.caps).toEqual({
+      half_cap: { time: 1500, pointCap: 8 },
+    });
+  });
+});

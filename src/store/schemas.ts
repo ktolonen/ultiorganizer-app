@@ -27,6 +27,8 @@ const row = z.object({
     'roster',
     'metadata',
     'finalize',
+    'cap',
+    'remove_cap',
     'upload',
   ]),
   event: z
@@ -43,6 +45,7 @@ const row = z.object({
   attempts: z.number().int(),
   createdAt: z.number(),
   serverNum: z.number().int().optional(),
+  skipped: z.boolean().optional(),
   error: z
     .object({
       status: z.number(),
@@ -68,6 +71,7 @@ export const outboxSchema: z.ZodType<OutboxState> = z.object({
   nextAttemptAt: z.number(),
   offline: z.boolean(),
   offlineOnly: z.boolean(),
+  capsAbsent: z.boolean().optional(),
 }) as unknown as z.ZodType<OutboxState>;
 
 const timer = z.object({

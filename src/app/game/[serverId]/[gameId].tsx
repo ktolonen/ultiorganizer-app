@@ -2,9 +2,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { cleanOfficial, currentScore, timeoutsLeft, type GameEvent } from '../../../game/reducer';
+import {
+  CAP_TYPES,
+  cleanOfficial,
+  currentScore,
+  timeoutsLeft,
+  type CapType,
+  type GameEvent,
+} from '../../../game/reducer';
 import type { Side } from '../../../game/types';
 import {
+  CapSheet,
   ColorPicker,
   GoalSheet,
   nameOf,
@@ -43,6 +51,7 @@ export default function GameScreen() {
   const [goalSide, setGoalSide] = useState<Side | null>(null);
   const [asking, setAsking] = useState<Asking>(null);
   const [confirmFinal, setConfirmFinal] = useState(false);
+  const [capOpen, setCapOpen] = useState<CapType | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [autoPoint, setAutoPoint] = useState(true);
   const [savedName, setSavedName] = useState<string | null>(null);
@@ -172,6 +181,19 @@ export default function GameScreen() {
     return `${g.num}. ${g.homeScore}–${g.awayScore}  ${scorer} ← ${assist}${g.time !== null ? `  ${formatTime(g.time)}` : ''}`;
   };
 
+  const capName = (cap: CapType) =>
+    cap === 'half_cap' ? t('term.halftimeCap') : t('term.timeCap');
+  // The timekeeper's cap notice offers to record the cap it announces, unless it is recorded
+  // already. Events that hide times record no caps, as on the server.
+  const noticeCap: CapType | null = hideTimes
+    ? null
+    : tk.caps.active === 'time'
+      ? 'time_cap'
+      : tk.caps.active === 'half'
+        ? 'half_cap'
+        : null;
+  const offerCap = noticeCap && !state.caps[noticeCap] ? noticeCap : null;
+
   const synced = isFullySynced(outbox);
   const failedRow = outbox.rows.find((r) => r.status === 'failed');
 
@@ -217,6 +239,13 @@ export default function GameScreen() {
         <View style={{ flex: 1 }}>
           <View style={styles.clockRow}>
             <GameClockPanel tk={tk} compact />
+            {offerCap && (
+              <Button
+                label={t('game.recordCap')}
+                kind="secondary"
+                onPress={() => setCapOpen(offerCap)}
+              />
+            )}
           </View>
           <View style={styles.halves}>
             {(['home', 'away'] as const).map((side) => (
@@ -314,6 +343,34 @@ export default function GameScreen() {
           <Txt muted>
             {t('term.halftime')}: {state.halftime !== null ? formatTime(state.halftime) : '–'}
           </Txt>
+          {!hideTimes && (
+            <>
+              <Divider />
+              {CAP_TYPES.map((cap) => {
+                const c = state.caps[cap];
+                return (
+                  <View key={cap} style={{ gap: 4 }}>
+                    <Txt muted>
+                      {capName(cap)}:{' '}
+                      {c
+                        ? t('game.capLine', { time: formatTime(c.time), points: c.pointCap })
+                        : t('game.capNone')}
+                    </Txt>
+                    <Button
+                      label={c ? t('game.capEdit') : t('game.recordCap')}
+                      kind="secondary"
+                      onPress={() => setCapOpen(cap)}
+                    />
+                  </View>
+                );
+              })}
+              {outbox.capsAbsent && (
+                <Txt variant="small" muted>
+                  {t('game.capsLocal')}
+                </Txt>
+              )}
+            </>
+          )}
           <Divider />
           <ScorekeeperField
             key={state.official ?? ''}
@@ -369,6 +426,27 @@ export default function GameScreen() {
         onSave={saveGoal}
         onClose={() => setGoalSide(null)}
       />
+
+      {capOpen && (
+        <CapSheet
+          cap={capOpen}
+          state={state}
+          clockSeconds={clockSeconds}
+          onSave={(c) => {
+            const cap = capOpen;
+            setCapOpen(null);
+            if (apply({ type: 'cap', cap, ...c }) && noticeCap === cap) {
+              tk.dismissCap(cap === 'time_cap' ? 'time' : 'half');
+            }
+          }}
+          onRemove={() => {
+            const cap = capOpen;
+            setCapOpen(null);
+            apply({ type: 'remove_cap', cap });
+          }}
+          onClose={() => setCapOpen(null)}
+        />
+      )}
 
       <TeamPicker
         visible={asking !== null}

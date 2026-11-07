@@ -22,6 +22,8 @@ export type RowOp =
   | 'roster'
   | 'metadata'
   | 'finalize'
+  | 'cap'
+  | 'remove_cap'
   | 'upload';
 
 export type RowStatus = 'pending' | 'sending' | 'sent' | 'failed';
@@ -44,6 +46,8 @@ export type OutboxRow = {
   createdAt: number;
   /** Set when sent. */
   serverNum?: number;
+  /** A cap row the server had no route for (it predates caps): settled without being stored. */
+  skipped?: boolean;
   /** The refusal of a failed row, or the last server error of a row still being retried. */
   error?: { status: number; code: string; path?: string; message: string };
 };
@@ -63,6 +67,8 @@ export type OutboxState = {
   offline: boolean;
   /** The game was kept without a server, so only a full upload can sync it. */
   offlineOnly: boolean;
+  /** The server answered a cap write with "no such route": caps stay on this phone. */
+  capsAbsent?: boolean;
 };
 
 export function newOutbox(
@@ -164,6 +170,15 @@ export function requestFor(event: GameEvent, ctx: RequestContext): Req | null {
     }
     case 'finalize':
       return { op: 'finalize', method: 'POST', path: `${base}/finalize`, body: null };
+    case 'cap':
+      return {
+        op: 'cap',
+        method: 'PUT',
+        path: `${base}/caps/${event.cap}`,
+        body: { time: event.time, point_cap: event.pointCap },
+      };
+    case 'remove_cap':
+      return { op: 'remove_cap', method: 'DELETE', path: `${base}/caps/${event.cap}`, body: null };
     case 'remove_timeout':
     case 'remove_spirit_stoppage':
       return null; // no live delete: corrected locally and synced by full upload
@@ -203,10 +218,14 @@ export function enqueue(
 export const hasInFlight = (state: OutboxState): boolean =>
   state.rows.some((r) => r.status === 'sending');
 
+const isCapOp = (op: RowOp): boolean => op === 'cap' || op === 'remove_cap';
+
 /**
  * Replaces every unsent row with one full upload (`PUT game-data`, `If-Match` =
- * the newest token). The document already contains the unsent events. Refused
- * while a request is in flight, since that request may or may not have landed.
+ * the newest token). The document already contains the unsent events, except caps:
+ * an upload keeps the server's caps, so unsent cap rows stay queued ahead of it, in
+ * order. A refused cap row is dropped, since sending it again would be refused again.
+ * Refused while a request is in flight, since that request may or may not have landed.
  */
 export function enqueueUpload(
   state: OutboxState,
@@ -215,7 +234,9 @@ export function enqueueUpload(
   now: number,
 ): OutboxState | null {
   if (hasInFlight(state) || state.token === null) return null;
-  const kept = state.rows.filter((r) => r.status === 'sent');
+  const kept = state.rows.filter(
+    (r) => r.status === 'sent' || (isCapOp(r.op) && r.status === 'pending'),
+  );
   const req: Req = {
     op: 'upload',
     method: 'PUT',
@@ -333,6 +354,16 @@ export function onResponse(
   if (res.kind === 'network') return retry(backoffMs(row.attempts), true);
 
   const { status, code } = res;
+  // A server without caps has no such route. Caps are not part of the token, so the
+  // row can be settled and the queue go on; the caps stay on this phone.
+  if (isCapOp(row.op) && ((status === 404 && code === 'not_found') || status === 405)) {
+    return {
+      ...update(state, key, (r) => ({ ...r, status: 'sent', skipped: true, error: undefined })),
+      capsAbsent: true,
+      nextAttemptAt: 0,
+      offline: false,
+    };
+  }
   const serverError = { status, code, path: res.path, message: res.message ?? code };
   if (status === 429 || status === 503) {
     const wait =
@@ -476,6 +507,8 @@ export function planUndo(state: OutboxState, key: string): UndoPlan {
     case 'score_tap':
     case 'roster':
     case 'metadata':
+    case 'cap':
+    case 'remove_cap':
       return { kind: 'inverse' };
     case 'delete_goal':
     case 'finalize':

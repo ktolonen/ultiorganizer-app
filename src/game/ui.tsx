@@ -5,7 +5,17 @@ import { Button, TextField, Txt } from '../ui/components';
 import { useTheme } from '../ui/theme';
 import { FONTS, SIZE, SPACE, TARGET, TEAM_SWATCHES, readableOn } from '../ui/tokens';
 import { back, initialPicker, pick, stepOf, toggleCallahan } from './goalPicker';
-import { cleanOfficial, MAX_OFFICIAL_LENGTH, type GameState } from './reducer';
+import {
+  cleanOfficial,
+  currentScore,
+  MAX_CAP_TIME,
+  MAX_OFFICIAL_LENGTH,
+  MAX_POINT_CAP,
+  minPointCap,
+  suggestedPointCap,
+  type CapType,
+  type GameState,
+} from './reducer';
 import type { RosterEntry, Side } from './types';
 
 const nameOf = (state: GameState, side: Side, id: number | null): string => {
@@ -215,6 +225,124 @@ export function GoalSheet({
   );
 }
 
+const mmss = (seconds: number) =>
+  `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+function Stepper({
+  label,
+  value,
+  steps,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  steps: { label: string; delta: number; disabled?: boolean }[];
+  onChange: (delta: number) => void;
+}) {
+  const half = Math.ceil(steps.length / 2);
+  const cell = (st: (typeof steps)[number]) => (
+    <View key={st.label} style={{ flex: 1 }}>
+      <Button
+        label={st.label}
+        kind="secondary"
+        disabled={st.disabled}
+        onPress={() => onChange(st.delta)}
+      />
+    </View>
+  );
+  return (
+    <View style={{ gap: 4 }}>
+      <Txt muted>{label}</Txt>
+      <View style={styles.stepper}>
+        {steps.slice(0, half).map(cell)}
+        <Txt
+          variant="figure"
+          accessibilityLabel={`${label} ${value}`}
+          style={{ fontSize: SIZE.lg, minWidth: 72, textAlign: 'center' }}
+        >
+          {value}
+        </Txt>
+        {steps.slice(half).map(cell)}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Records a halftime cap or time cap, or corrects the recorded one, like the Scorekeeper
+ * cap page: the time it was called and the new point cap, which for a new cap starts one
+ * above the higher score. Render it only while open, so each opening starts fresh.
+ */
+export function CapSheet({
+  cap,
+  state,
+  clockSeconds,
+  onSave,
+  onRemove,
+  onClose,
+}: {
+  cap: CapType;
+  state: GameState;
+  clockSeconds: number;
+  onSave: (c: { time: number; pointCap: number }) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { palette } = useTheme();
+  const recorded = state.caps[cap];
+  const [time, setTime] = useState(() =>
+    Math.min(MAX_CAP_TIME, Math.max(0, Math.round(recorded?.time ?? clockSeconds))),
+  );
+  const [pointCap, setPointCap] = useState(() => suggestedPointCap(state, cap));
+  const min = minPointCap(state, cap);
+  const score = currentScore(state);
+  const moveTime = (d: number) => setTime((v) => Math.min(MAX_CAP_TIME, Math.max(0, v + d)));
+  const movePoints = (d: number) =>
+    setPointCap((v) => Math.min(MAX_POINT_CAP, Math.max(min, v + d)));
+  const title = cap === 'half_cap' ? t('term.halftimeCap') : t('term.timeCap');
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.backdrop}>
+        <View
+          style={[styles.sheet, { backgroundColor: palette.surface, borderColor: palette.ink }]}
+        >
+          <Txt variant="heading" accessibilityRole="header">
+            {title}
+          </Txt>
+          <Txt muted>
+            {t('term.currentScore')}: {score.home} – {score.away}
+          </Txt>
+          <Stepper
+            label={t('game.capCalledAt', { cap: title })}
+            value={mmss(time)}
+            steps={[
+              { label: '−1:00', delta: -60, disabled: time === 0 },
+              { label: '−0:05', delta: -5, disabled: time === 0 },
+              { label: '+0:05', delta: 5, disabled: time === MAX_CAP_TIME },
+              { label: '+1:00', delta: 60, disabled: time === MAX_CAP_TIME },
+            ]}
+            onChange={moveTime}
+          />
+          <Stepper
+            label={t('term.newPointCap')}
+            value={String(pointCap)}
+            steps={[
+              { label: '−1', delta: -1, disabled: pointCap <= min },
+              { label: '+1', delta: 1, disabled: pointCap >= MAX_POINT_CAP },
+            ]}
+            onChange={movePoints}
+          />
+          <Button label={t('common.save')} onPress={() => onSave({ time, pointCap })} />
+          {recorded && <Button label={t('term.removeCap')} kind="secondary" onPress={onRemove} />}
+          <Button label={t('common.cancel')} kind="secondary" onPress={onClose} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 /** Two team-coloured buttons: which team called it. */
 export function TeamPicker({
   visible,
@@ -410,6 +538,7 @@ const styles = StyleSheet.create({
     gap: SPACE.md,
   },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
   chip: {
     borderWidth: 2,
     borderRadius: 12,

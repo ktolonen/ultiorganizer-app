@@ -1,6 +1,6 @@
 # Status
 
-Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18).
+Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18), with caps added on 2026-11-07.
 
 ## Verified here
 
@@ -8,12 +8,13 @@ Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18).
 
 ## Built
 
-| Plan phase          | Done                                                                                                                                                                                                                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 Foundation        | Expo SDK 58 project, tokens (Light/Dark, 12 team swatches, contrast-tested), i18n (en complete; fi/de/es seeded from the server `.po`), SQLite schema and repository, generated API client, pairing (token paste, setup-QR parsing, `/version` check), scorekeeping-QR scan, game list |
-| 2 Timekeeper        | Engine port with tests (all scenarios, timeout-before-pull, repeat, caps, pause, JSON round-trip recovery), persisted wall-clock anchors, timer screen, generated beeps, haptics, local notifications while backgrounded, keep-awake, bundled WFDF templates, Timekeeper-only mode    |
-| 3 Live scorekeeping | Entry-context parsing, reducer mirroring the API rules, rosters, live screen, goal sheet, timeouts, spirit stoppages, score taps, outbox with idempotent replay and backoff, sync dot, finalize                                                                                       |
-| 4 Resilience        | Conflict sheet (keep server / upload mine), full-upload fallback and fall-behind offer, offline-only sessions, undo per the rules, crash recovery from the persisted outbox                                                                                                           |
+| Plan phase          | Done                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Foundation        | Expo SDK 58 project, tokens (Light/Dark, 12 team swatches, contrast-tested), i18n (en complete; fi/de/es seeded from the server `.po`), SQLite schema and repository, generated API client, pairing (token paste, setup-QR parsing, `/version` check), scorekeeping-QR scan, game list                                                                                      |
+| 2 Timekeeper        | Engine port with tests (all scenarios, timeout-before-pull, repeat, caps, pause, JSON round-trip recovery), persisted wall-clock anchors, timer screen, generated beeps, haptics, local notifications while backgrounded, keep-awake, bundled WFDF templates, Timekeeper-only mode                                                                                          |
+| 3 Live scorekeeping | Entry-context parsing, reducer mirroring the API rules, rosters, live screen, goal sheet, timeouts, spirit stoppages, score taps, outbox with idempotent replay and backoff, sync dot, finalize                                                                                                                                                                             |
+| 4 Resilience        | Conflict sheet (keep server / upload mine), full-upload fallback and fall-behind offer, offline-only sessions, undo per the rules, crash recovery from the persisted outbox                                                                                                                                                                                                 |
+| 5 Caps (S2)         | "Record cap" from the timekeeper's cap notice and on the Sheet tab: time called (5-second steps) and new point cap, suggested one above the higher score; correct or remove a recorded cap. Rules mirrored in the reducer (`times_hidden`, `point_cap_too_low`, any point cap from 1 for a correction, allowed on a final game). Synced through `PUT`/`DELETE caps/{type}`. |
 
 ## Differences from the plan
 
@@ -26,16 +27,17 @@ Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18).
 - Timekeeper sessions are scoped: one clock for Timekeeper-only mode and one per game. The template choice and local edits are shared per device.
 - A 2xx answer that is not a write answer (captive portal) is retried with the same key, never marked sent.
 - Server signal texts are database translations (`uo_translation`), not in the `.po` files, the app sends `Accept-Language` to the S1 templates route, so fi/de/es signal texts come from the server when it is new enough, and fall back to bundled English otherwise.
+- **Caps sit outside the token and the full upload.** A full upload keeps the server's caps, so unsent cap rows stay queued ahead of an upload instead of being folded into it; a refused cap row is dropped when the whole game is uploaded. A server without the caps route answers `404 not_found` (or `405`): that cap row is settled as skipped, the outbox remembers `capsAbsent`, later caps of that game stay on the phone, and the Sheet tab says so.
 - Day `signal-warn` (`#E8A200`) is 2.2:1 on white. It is used only as a fill with text on it (9.6:1), never as a line or icon; a test records this.
 
 ## Not done
 
-- **Server work S0–S2** is done in `../ultiorganizer` (setup QR, `GET timekeeper/templates`, caps writes). `api/openapi.json` and the generated types are synced to it. The app still works against servers without them: paste-token pairing, a 404 on templates falls back to bundled defaults (probed once, cached). "Record cap" is not built yet, so caps set on the phone stay local and do not reach the server.
-- **Maestro flows, EAS builds, store assets and submission, a beta at a real tournament**: need devices, accounts and an event.
+- **Server work S0–S2** is done in `../ultiorganizer` (setup QR, `GET timekeeper/templates`, caps writes). `api/openapi.json` and the generated types are synced to it. The app still works against servers without them: paste-token pairing, a 404 on templates falls back to bundled defaults (probed once, cached), and caps stay on the phone.
+- **EAS**: the project is linked, development and preview profiles build APKs, iOS declares exempt encryption, and `expo-updates` is in for OTA updates. **Maestro flows, store assets and submission, a beta at a real tournament** still need devices, accounts and an event.
 - A way to start a game offline-only. Needs a design decision first: without a server there is no entry context (teams, rules, game id), so it would be a device-local game with typed team names that can never be uploaded. The existing `offlineOnly` outbox flag covers only a real game that falls behind.
 - Landscape layout, screenshots in Light/Dark × phone/tablet × en/fi/de, an accessibility pass with VoiceOver/TalkBack, reviewed translations, Sentry (opt-in).
 - Contract tests against the dev stack (`docs/dev/compose.yaml`).
-- Goal times use the game clock rounded to the second; the web Scorekeeper's exact rounding rule was not checked beyond `roundedTime()`.
+- Goal and timeout times use the game clock rounded to the second. The web Scorekeeper (`script/scorekeeper.js` `roundedTime()`) floors to the second and then rounds to the nearest 5 seconds, with a carry into the minute, because its form only offers 5-second steps. The API takes any second, so the app keeps the exact time; whether to match the 5-second steps is a product decision, not yet made.
 
 ## Process note
 

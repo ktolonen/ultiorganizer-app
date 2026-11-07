@@ -184,3 +184,20 @@ describe('refreshEligible', () => {
     expect(refreshEligible(s, otherGame)).toBe(s);
   });
 });
+
+describe('caps', () => {
+  const capEv: GameEvent = { type: 'cap', cap: 'half_cap', time: 1500, pointCap: 8 };
+  it('queues a cap write', () => {
+    const s = must(applyEvent(session(), capEv, deps()));
+    expect(s.state.caps.half_cap).toEqual({ time: 1500, pointCap: 8 });
+    expect(s.outbox.rows.map((r) => r.op)).toEqual(['cap']);
+  });
+  it('keeps caps on the phone once the server is known to lack the route', () => {
+    const base = session();
+    const s = must(
+      applyEvent({ ...base, outbox: { ...base.outbox, capsAbsent: true } }, capEv, deps()),
+    );
+    expect(s.state.caps.half_cap).toBeDefined();
+    expect(s.outbox.rows).toEqual([]);
+  });
+});

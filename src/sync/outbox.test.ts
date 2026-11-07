@@ -413,3 +413,51 @@ describe('fall-behind', () => {
     expect(syncStatus(add(fresh(), goalEv(1)))).toEqual({ kind: 'queued', queued: 1 });
   });
 });
+
+describe('caps', () => {
+  const capEv: GameEvent = { type: 'cap', cap: 'time_cap', time: 4800, pointCap: 12 };
+  it('maps cap events to the caps route', () => {
+    const s = add(add(fresh(), capEv), { type: 'remove_cap', cap: 'half_cap' });
+    expect(s.rows.map((r) => [r.op, r.method, r.path, r.body])).toEqual([
+      ['cap', 'PUT', '/games/123/caps/time_cap', { time: 4800, point_cap: 12 }],
+      ['remove_cap', 'DELETE', '/games/123/caps/half_cap', null],
+    ]);
+  });
+  it('settles a cap row and goes on when the server has no caps route', () => {
+    const s = add(add(fresh(), capEv), goalEv(10));
+    const { state } = step(s, { kind: 'http', status: 404, code: 'not_found' });
+    expect(state.rows[0]).toMatchObject({ status: 'sent', skipped: true });
+    expect(state.capsAbsent).toBe(true);
+    expect(state.paused).toBeNull();
+    expect(nextToSend(state, 0)?.path).toBe('/games/123/goals');
+  });
+  it('pauses on a refused cap like any other refused row', () => {
+    const { state } = step(add(fresh(), capEv), {
+      kind: 'http',
+      status: 409,
+      code: 'point_cap_too_low',
+    });
+    expect(state.paused).toMatchObject({ reason: 'failed', code: 'point_cap_too_low' });
+    expect(state.capsAbsent).toBeUndefined();
+  });
+  it('keeps unsent cap rows ahead of a full upload, which does not carry caps', () => {
+    const s = add(add(add(fresh(), goalEv(10)), capEv), goalEv(20));
+    const up = enqueueUpload(s, doc, key(), 0)!;
+    expect(up.rows.map((r) => r.op)).toEqual(['cap', 'upload']);
+    expect(up.rows[1].ifMatch).toBe('tok0');
+  });
+  it('drops a refused cap row when the whole game is uploaded', () => {
+    const { state } = step(add(fresh(), capEv), {
+      kind: 'http',
+      status: 409,
+      code: 'point_cap_too_low',
+    });
+    const up = uploadMyVersion(state, { token: 'tok9', result: null }, doc, key(), 0)!;
+    expect(up.rows.map((r) => r.op)).toEqual(['upload']);
+    expect(up.paused).toBeNull();
+  });
+  it('undoes a sent cap with a new write', () => {
+    const { state } = step(add(fresh(), capEv), ok('tok1'));
+    expect(planUndo(state, state.rows[0].key)).toEqual({ kind: 'inverse' });
+  });
+});

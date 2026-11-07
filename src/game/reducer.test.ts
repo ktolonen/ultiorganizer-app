@@ -5,8 +5,10 @@ import {
   cleanOfficial,
   currentScore,
   fromEntryContext,
+  minPointCap,
   reduce,
   replay,
+  suggestedPointCap,
   timeoutsLeft,
 } from './reducer';
 import { entryContextSchema } from './types';
@@ -352,5 +354,66 @@ describe('toGameData (full upload)', () => {
   it('refuses a fixture without teams', () => {
     const s = base();
     expect(toGameData({ ...s, teamIds: { home: null, away: 5 } }).ok).toBe(false);
+  });
+});
+
+describe('caps', () => {
+  const cap = (pointCap: number, time = 1500, which: 'half_cap' | 'time_cap' = 'half_cap') =>
+    ({ type: 'cap', cap: which, time, pointCap }) as const;
+  const at = (home: number, away: number) => base({ result: { home, away, state: 'ongoing' } });
+
+  it('reads recorded caps from the entry context and ignores unknown types', () => {
+    const s = base({
+      retained: {
+        ...entryContextFixture().retained,
+        cap_events: [
+          { type: 'time_cap', time: 4800, point_cap: 12 },
+          { type: 'soft_cap', time: 1, point_cap: 1 },
+        ],
+      },
+    });
+    expect(s.caps).toEqual({ time_cap: { time: 4800, pointCap: 12 } });
+  });
+  it('records a new cap above the higher score', () => {
+    const s = must(at(7, 5), cap(8));
+    expect(s.caps.half_cap).toEqual({ time: 1500, pointCap: 8 });
+    expect(code(at(7, 5), cap(7))).toBe('point_cap_too_low:point_cap');
+  });
+  it('lets a recorded cap be corrected to any point cap from 1', () => {
+    const s = must(must(at(7, 5), cap(8)), cap(3, 1600));
+    expect(s.caps.half_cap).toEqual({ time: 1600, pointCap: 3 });
+    expect(code(s, cap(0))).toBe('validation_failed:point_cap');
+    expect(code(s, cap(256))).toBe('validation_failed:point_cap');
+  });
+  it('checks the time like the server', () => {
+    expect(code(base(), cap(1, -1))).toBe('validation_failed:time');
+    expect(code(base(), cap(1, 32768))).toBe('validation_failed:time');
+    expect(code(base(), cap(1, 32767))).toBe('ok');
+  });
+  it('allows a cap on a final game and refuses it on a forfeit', () => {
+    expect(code(base({ result: { home: 9, away: 4, state: 'final' } }), cap(10))).toBe('ok');
+    const forfeit = base({ retained: { ...entryContextFixture().retained, forfeit: 'home' } });
+    expect(code(forfeit, cap(1))).toBe('forfeit');
+  });
+  it('is refused while the event hides times', () => {
+    expect(code(rulesWith({ hide_time_on_scoresheet: true }), cap(1))).toBe('times_hidden');
+  });
+  it('removes a cap, and removing an absent one changes nothing', () => {
+    const s = must(must(base(), cap(5)), { type: 'remove_cap', cap: 'half_cap' });
+    expect(s.caps).toEqual({});
+    const same = base();
+    expect(must(same, { type: 'remove_cap', cap: 'time_cap' })).toBe(same);
+  });
+  it('suggests one above the higher score, or the recorded point cap', () => {
+    const s = at(7, 9);
+    expect(suggestedPointCap(s, 'time_cap')).toBe(10);
+    expect(minPointCap(s, 'time_cap')).toBe(10);
+    const recorded = must(s, cap(11, 4000, 'time_cap'));
+    expect(suggestedPointCap(recorded, 'time_cap')).toBe(11);
+    expect(minPointCap(recorded, 'time_cap')).toBe(1);
+  });
+  it('is left out of a full upload', () => {
+    const s = must(base(), cap(5));
+    expect(JSON.stringify(toGameData(s))).not.toMatch(/point_cap|_cap"/);
   });
 });

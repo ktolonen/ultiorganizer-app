@@ -52,6 +52,10 @@ export function applyEvent(session: GameSession, event: GameEvent, deps: Deps): 
       : queueUpload(session, state, deps);
   }
   if (session.outbox.offlineOnly) return { ok: true, session: { ...session, state } };
+  // A server without the caps route keeps caps on the phone only.
+  if ((event.type === 'cap' || event.type === 'remove_cap') && session.outbox.capsAbsent) {
+    return { ok: true, session: { ...session, state } };
+  }
   const outbox = enqueue(session.outbox, event, state.teamIds, deps.newKey(), deps.now);
   return { ok: true, session: { ...session, state, outbox } };
 }

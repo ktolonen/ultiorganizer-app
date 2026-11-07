@@ -20,6 +20,12 @@ export type Goal = {
 };
 
 export type Stoppage = { time: number };
+
+export type CapType = 'half_cap' | 'time_cap';
+export const CAP_TYPES: readonly CapType[] = ['half_cap', 'time_cap'];
+/** A recorded halftime cap or time cap: when it was called and the new point cap. */
+export type Cap = { time: number; pointCap: number };
+export type Caps = Partial<Record<CapType, Cap>>;
 export type BySide<T> = Record<Side, T>;
 
 export type GameState = {
@@ -38,6 +44,11 @@ export type GameState = {
   rules: Rules;
   /** Player ids the defence sheet refers to; they must stay on a roster. */
   retainedPlayerIds: number[];
+  /**
+   * Halftime cap and time cap. Not part of the concurrency token or of a full upload,
+   * which keeps the server's caps; they sync only through their own route.
+   */
+  caps: Caps;
 };
 
 export type GameEvent =
@@ -63,7 +74,10 @@ export type GameEvent =
       halftime?: number | null;
       official?: string | null;
     }
-  | { type: 'finalize' };
+  | { type: 'finalize' }
+  /** Records a cap, or corrects the recorded one. */
+  | { type: 'cap'; cap: CapType; time: number; pointCap: number }
+  | { type: 'remove_cap'; cap: CapType };
 
 export type GameErrorCode =
   | 'forfeit'
@@ -75,6 +89,8 @@ export type GameErrorCode =
   | 'score_out_of_range'
   | 'score_changed'
   | 'player_referenced'
+  | 'times_hidden'
+  | 'point_cap_too_low'
   | 'validation_failed';
 
 export type GameError = { code: GameErrorCode; path?: string; message: string };
@@ -85,6 +101,9 @@ export const MAX_GOAL_TIME = 32767;
 export const MAX_STOPPAGE_TIME = 86400;
 export const MAX_ROSTER = 100;
 export const MAX_OFFICIAL_LENGTH = 50;
+/** The server stores cap times in a smallint, like goal times. */
+export const MAX_CAP_TIME = 32767;
+export const MAX_POINT_CAP = 255;
 
 /** Trim a typed scorekeeper name and cap it at what the server accepts. */
 export const cleanOfficial = (name: string): string =>
@@ -97,6 +116,17 @@ const fail = (code: GameErrorCode, message: string, path?: string): Reduced => (
 });
 const ok = (state: GameState): Reduced => ({ ok: true, state });
 const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n);
+
+/** The caps the entry context lists; unknown event types are ignored. */
+export function capsFromContext(ctx: EntryContext): Caps {
+  const caps: Caps = {};
+  for (const e of ctx.retained.cap_events) {
+    if ((CAP_TYPES as readonly string[]).includes(e.type)) {
+      caps[e.type as CapType] = { time: e.time, pointCap: e.point_cap };
+    }
+  }
+  return caps;
+}
 
 export function fromEntryContext(ctx: EntryContext): GameState {
   return {
@@ -123,7 +153,26 @@ export function fromEntryContext(ctx: EntryContext): GameState {
     forfeit: ctx.retained.forfeit !== 'none',
     rules: ctx.rules,
     retainedPlayerIds: ctx.retained.defenses.referenced_player_ids,
+    caps: capsFromContext(ctx),
   };
+}
+
+/**
+ * The point cap to offer for a new cap: one above the higher score, the lowest the
+ * server accepts, as the Scorekeeper cap page suggests. A recorded cap keeps its own.
+ */
+export function suggestedPointCap(state: GameState, cap: CapType): number {
+  const recorded = state.caps[cap];
+  if (recorded) return recorded.pointCap;
+  const s = currentScore(state);
+  return Math.min(MAX_POINT_CAP, Math.max(s.home, s.away) + 1);
+}
+
+/** The lowest point cap the server takes: above the score for a new cap, 1 for a correction. */
+export function minPointCap(state: GameState, cap: CapType): number {
+  if (state.caps[cap]) return 1;
+  const s = currentScore(state);
+  return Math.max(s.home, s.away) + 1;
 }
 
 /** Score the goal list adds up to. */
@@ -323,6 +372,38 @@ function reduceFinalize(state: GameState): Reduced {
   return ok({ ...state, result: { ...state.result, state: 'final' } });
 }
 
+// Like the server: a final game can still take a cap, and the score check uses the
+// stored result, not the goal total.
+function reduceCap(
+  state: GameState,
+  e: Extract<GameEvent, { type: 'cap' | 'remove_cap' }>,
+): Reduced {
+  if (state.rules.hide_time_on_scoresheet) {
+    return fail('times_hidden', 'Caps are not recorded while the event hides times.');
+  }
+  if (!CAP_TYPES.includes(e.cap)) return fail('validation_failed', 'No such cap.', 'type');
+  if (e.type === 'remove_cap') {
+    if (!state.caps[e.cap]) return ok(state);
+    const caps = { ...state.caps };
+    delete caps[e.cap];
+    return ok({ ...state, caps });
+  }
+  if (!isInt(e.time) || e.time < 0 || e.time > MAX_CAP_TIME) {
+    return fail('validation_failed', 'A time from 0 to 32767 is required.', 'time');
+  }
+  if (!isInt(e.pointCap) || e.pointCap < 1 || e.pointCap > MAX_POINT_CAP) {
+    return fail('validation_failed', 'The point cap must be 1 to 255.', 'point_cap');
+  }
+  if (e.pointCap < minPointCap(state, e.cap)) {
+    return fail(
+      'point_cap_too_low',
+      'A new point cap must be greater than the score.',
+      'point_cap',
+    );
+  }
+  return ok({ ...state, caps: { ...state.caps, [e.cap]: { time: e.time, pointCap: e.pointCap } } });
+}
+
 export function reduce(state: GameState, event: GameEvent): Reduced {
   if (state.forfeit) return fail('forfeit', 'The game is a forfeit.');
   switch (event.type) {
@@ -353,6 +434,9 @@ export function reduce(state: GameState, event: GameEvent): Reduced {
       return reduceMetadata(state, event);
     case 'finalize':
       return reduceFinalize(state);
+    case 'cap':
+    case 'remove_cap':
+      return reduceCap(state, event);
   }
 }
 
