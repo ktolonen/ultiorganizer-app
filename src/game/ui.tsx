@@ -9,7 +9,9 @@ import {
   cleanOfficial,
   currentScore,
   MAX_CAP_TIME,
+  MAX_NOTE_BYTES,
   MAX_OFFICIAL_LENGTH,
+  utf8Bytes,
   MAX_POINT_CAP,
   minPointCap,
   suggestedPointCap,
@@ -647,6 +649,49 @@ export function ScorekeeperField({
         autoCorrect={false}
         returnKeyType="done"
         accessibilityLabel={t('term.scorekeeper')}
+      />
+    </View>
+  );
+}
+
+/**
+ * The game note, as on the Scorekeeper note page: saved with the button, an empty text
+ * clears it. The server takes at most 4000 UTF-8 bytes; the count shows near the limit.
+ */
+export function NoteField({
+  value,
+  onSave,
+}: {
+  value: string | null;
+  onSave: (text: string) => boolean;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(value ?? '');
+  const bytes = utf8Bytes(draft.trim());
+  const changed = draft.trim() !== (value ?? '');
+  return (
+    <View style={{ gap: 4 }}>
+      <Txt muted>{t('game.note')}</Txt>
+      <TextField
+        value={draft}
+        onChangeText={setDraft}
+        multiline
+        textAlignVertical="top"
+        style={{ minHeight: TARGET.min * 2, paddingVertical: SPACE.sm }}
+        accessibilityLabel={t('game.note')}
+      />
+      {bytes > MAX_NOTE_BYTES * 0.9 && (
+        <Txt variant="small" muted>
+          {t('game.noteBytes', { bytes, max: MAX_NOTE_BYTES })}
+        </Txt>
+      )}
+      <Button
+        label={t('common.save')}
+        kind="secondary"
+        disabled={!changed || bytes > MAX_NOTE_BYTES}
+        onPress={() => {
+          if (onSave(draft)) setDraft(draft.trim());
+        }}
       />
     </View>
   );

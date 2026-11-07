@@ -27,6 +27,7 @@ export type RowOp =
   | 'correct_goal'
   | 'delete_timeout'
   | 'delete_spirit_stoppage'
+  | 'note'
   | 'upload';
 
 export type RowStatus = 'pending' | 'sending' | 'sent' | 'failed';
@@ -51,7 +52,10 @@ export type OutboxRow = {
   serverNum?: number;
   /** A goal row: the goal's number on this phone when it was recorded. */
   localNum?: number;
-  /** A cap row the server had no route for (it predates caps): settled without being stored. */
+  /**
+   * Settled without being stored: a cap or note the server has no route for, or a note
+   * it refused because the app token is not a personal one.
+   */
   skipped?: boolean;
   /** The refusal of a failed row, or the last server error of a row still being retried. */
   error?: { status: number; code: string; path?: string; message: string };
@@ -84,6 +88,8 @@ export type OutboxState = {
    * stoppage (it predates them): those corrections go straight to a full upload.
    */
   correctionsAbsent?: boolean;
+  /** The server has no note route, or refused a note (`user_token_required`): notes stay here. */
+  noteRefused?: 'absent' | 'user_token_required';
 };
 
 export function newOutbox(
@@ -198,6 +204,8 @@ export function requestFor(event: GameEvent, ctx: RequestContext): Req | null {
     case 'remove_spirit_stoppage':
     case 'correct_goal':
       return null; // need the server's number: see deleteStoppageRequest and correctGoalRequest
+    case 'note':
+      return { op: 'note', method: 'PUT', path: `${base}/note`, body: { text: event.text.trim() } };
   }
 }
 
@@ -283,7 +291,7 @@ export const hasInFlight = (state: OutboxState): boolean =>
 
 const isCapOp = (op: RowOp): boolean => op === 'cap' || op === 'remove_cap';
 /** Ops whose data a full upload does not carry: they stay queued ahead of it. */
-const outsideUpload = (op: RowOp): boolean => isCapOp(op);
+const outsideUpload = (op: RowOp): boolean => isCapOp(op) || op === 'note';
 /** Corrections that fall back to a full upload when the live route cannot make them. */
 const isCorrectionOp = (op: RowOp): boolean =>
   op === 'correct_goal' || op === 'delete_timeout' || op === 'delete_spirit_stoppage';
@@ -445,6 +453,16 @@ export function onResponse(
       offline: false,
     };
   }
+  // Notes are outside the token too: a server without the route, or one that wants a
+  // personal app token for notes, settles the row and the queue goes on.
+  if (row.op === 'note' && (routeMissing(status, code) || code === 'user_token_required')) {
+    return {
+      ...update(state, key, (r) => ({ ...r, status: 'sent', skipped: true, error: undefined })),
+      noteRefused: code === 'user_token_required' ? 'user_token_required' : 'absent',
+      nextAttemptAt: 0,
+      offline: false,
+    };
+  }
   // A correction the live route cannot make: the caller replaces the queue with a full
   // upload, whose If-Match still catches a real conflict.
   if (isCorrectionOp(row.op) && (routeMissing(status, code) || STALE_CORRECTION_CODES.has(code))) {
@@ -601,6 +619,7 @@ export function planUndo(state: OutboxState, key: string): UndoPlan {
     case 'cap':
     case 'remove_cap':
     case 'correct_goal':
+    case 'note':
       return { kind: 'inverse' };
     case 'delete_goal':
     case 'delete_timeout':

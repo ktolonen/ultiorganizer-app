@@ -168,5 +168,10 @@
   "game.localNote": "Local game: kept on this phone only and never uploaded.",
   "game.correctGoal": "Correct goal {{num}}",
   "game.correctGoalHint": "Pick the assist and scorer again",
-  "game.removeSpirit": "Remove spirit stoppage"
+  "game.removeSpirit": "Remove spirit stoppage",
+  "game.note": "Game note",
+  "game.noteBytes": "{{bytes}} of {{max}} characters (accented letters count as two)",
+  "game.notePersonal": "Game notes need a personal app token. Set up the app with the code on your Scorekeeping app page in Ultiorganizer to write one.",
+  "game.noteAbsent": "This server does not store game notes.",
+  "error.note_too_long": "The note is too long."
 }

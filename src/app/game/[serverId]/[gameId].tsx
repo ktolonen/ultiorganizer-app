@@ -16,6 +16,7 @@ import {
   ColorPicker,
   GoalSheet,
   nameOf,
+  NoteField,
   numberOf,
   RosterEditor,
   ScorekeeperField,
@@ -24,7 +25,13 @@ import {
 } from '../../../game/ui';
 import { useGame, type ActionError } from '../../../game/useGame';
 import { isLocalGame } from '../../../game/local';
-import { AUTO_POINT_KEY, gameScope, parseAutoPoint, SCOREKEEPER_KEY } from '../../../store/repo';
+import {
+  AUTO_POINT_KEY,
+  gameScope,
+  noteRefusedKey,
+  parseAutoPoint,
+  SCOREKEEPER_KEY,
+} from '../../../store/repo';
 import { getRepo } from '../../../store/sqlite';
 import { isFullySynced, unsentRows } from '../../../sync/outbox';
 import { ActionButtons, ActionTimerBar, formatTime, GameClockPanel } from '../../../timekeeper/ui';
@@ -62,12 +69,14 @@ export default function GameScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [autoPoint, setAutoPoint] = useState(true);
   const [savedName, setSavedName] = useState<string | null>(null);
+  const [serverNoNotes, setServerNoNotes] = useState(false);
   useEffect(() => {
     void getRepo().then(async (r) => {
       setAutoPoint(parseAutoPoint(await r.getSetting(AUTO_POINT_KEY)));
       setSavedName(cleanOfficial((await r.getSetting(SCOREKEEPER_KEY)) ?? ''));
+      setServerNoNotes((await r.getSetting(noteRefusedKey(serverId))) === '1');
     });
-  }, []);
+  }, [serverId]);
 
   // A game with no scorekeeper gets the name from Settings, once per opening. A name already
   // on the game (set on the server or here) is never replaced.
@@ -453,6 +462,23 @@ export default function GameScreen() {
           )}
           {outbox.paused?.reason === 'auth' && (
             <Button label={t('game.resumeAuth')} kind="secondary" onPress={game.resumeAuth} />
+          )}
+          {/* A server new enough for notes sends the note field, null when it has none. */}
+          {context.note !== undefined && !local && (
+            <>
+              <Divider />
+              {serverNoNotes || outbox.noteRefused ? (
+                <Txt variant="small" muted>
+                  {t(outbox.noteRefused === 'absent' ? 'game.noteAbsent' : 'game.notePersonal')}
+                </Txt>
+              ) : (
+                <NoteField
+                  key={state.note ?? ''}
+                  value={state.note}
+                  onSave={(text) => apply({ type: 'note', text })}
+                />
+              )}
+            </>
           )}
         </ScrollView>
       )}

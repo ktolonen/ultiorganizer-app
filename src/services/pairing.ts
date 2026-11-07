@@ -1,6 +1,6 @@
 import { apiUrl, headersFor, type FetchLike } from '../api/http';
 import { normalizeRoot, type QrError, type QrOptions } from '../pairing/qr';
-import type { Repo, ServerRow } from '../store/repo';
+import { noteRefusedKey, type Repo, type ServerRow } from '../store/repo';
 
 export type PairError = QrError | 'network' | 'rejected' | 'unexpected';
 
@@ -38,6 +38,8 @@ export async function pairServer(
   const label = new URL(root.root).host;
   const server = await deps.repo.upsertServer(root.root, label, (deps.now ?? Date.now)());
   await deps.saveToken(server.id, token);
+  // A new token may be a personal one: offer game notes again.
+  await deps.repo.setSetting(noteRefusedKey(server.id), '');
   return { ok: true, server };
 }
 

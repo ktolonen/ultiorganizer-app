@@ -302,3 +302,17 @@ describe('corrections through the live routes', () => {
     ]);
   });
 });
+
+describe('note', () => {
+  it('queues a note, or keeps it on the phone once the server refused notes', () => {
+    const s = must(applyEvent(session(), { type: 'note', text: 'x' }, deps()));
+    expect(s.outbox.rows.map((r) => r.op)).toEqual(['note']);
+    const refused = {
+      ...session(),
+      outbox: { ...session().outbox, noteRefused: 'user_token_required' as const },
+    };
+    const t = must(applyEvent(refused, { type: 'note', text: 'x' }, deps()));
+    expect(t.state.note).toBe('x');
+    expect(t.outbox.rows).toEqual([]);
+  });
+});

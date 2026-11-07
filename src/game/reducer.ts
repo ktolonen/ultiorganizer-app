@@ -49,6 +49,11 @@ export type GameState = {
    * which keeps the server's caps; they sync only through their own route.
    */
   caps: Caps;
+  /**
+   * The game note. Not part of the token or of a full upload; only a personal (user-scoped)
+   * app token may read or write it, so for other tokens it stays null.
+   */
+  note: string | null;
 };
 
 export type GameEvent =
@@ -88,7 +93,9 @@ export type GameEvent =
   | { type: 'finalize' }
   /** Records a cap, or corrects the recorded one. */
   | { type: 'cap'; cap: CapType; time: number; pointCap: number }
-  | { type: 'remove_cap'; cap: CapType };
+  | { type: 'remove_cap'; cap: CapType }
+  /** Sets the game note; an empty text clears it. */
+  | { type: 'note'; text: string };
 
 export type GameErrorCode =
   | 'forfeit'
@@ -102,6 +109,7 @@ export type GameErrorCode =
   | 'player_referenced'
   | 'times_hidden'
   | 'point_cap_too_low'
+  | 'note_too_long'
   | 'validation_failed';
 
 export type GameError = { code: GameErrorCode; path?: string; message: string };
@@ -115,6 +123,18 @@ export const MAX_OFFICIAL_LENGTH = 50;
 /** The server stores cap times in a smallint, like goal times. */
 export const MAX_CAP_TIME = 32767;
 export const MAX_POINT_CAP = 255;
+/** The server's limit for the game note, in UTF-8 bytes. */
+export const MAX_NOTE_BYTES = 4000;
+
+/** UTF-8 length of a string, as the server counts it. */
+export function utf8Bytes(text: string): number {
+  let n = 0;
+  for (const ch of text) {
+    const cp = ch.codePointAt(0)!;
+    n += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+  }
+  return n;
+}
 
 /** Trim a typed scorekeeper name and cap it at what the server accepts. */
 export const cleanOfficial = (name: string): string =>
@@ -165,6 +185,7 @@ export function fromEntryContext(ctx: EntryContext): GameState {
     rules: ctx.rules,
     retainedPlayerIds: ctx.retained.defenses.referenced_player_ids,
     caps: capsFromContext(ctx),
+    note: ctx.note ?? null,
   };
 }
 
@@ -484,6 +505,14 @@ export function reduce(state: GameState, event: GameEvent): Reduced {
     case 'cap':
     case 'remove_cap':
       return reduceCap(state, event);
+    case 'note': {
+      // Like the server: trimmed, an empty text clears it, allowed on a final game.
+      const text = event.text.trim();
+      if (utf8Bytes(text) > MAX_NOTE_BYTES) {
+        return fail('note_too_long', 'The note is too long.', 'text');
+      }
+      return ok({ ...state, note: text === '' ? null : text });
+    }
   }
 }
 

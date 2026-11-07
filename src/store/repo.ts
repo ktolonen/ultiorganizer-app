@@ -197,7 +197,12 @@ export function createRepo(db: Db) {
         title: r.title,
         context,
         // Games stored before caps were kept read them from the stored entry context.
-        state: state.caps ? state : { ...state, caps: capsFromContext(context) },
+        state: {
+          ...state,
+          caps: state.caps ?? capsFromContext(context),
+          // Games stored before notes were kept take the note from the stored entry context.
+          note: state.note === undefined ? (context.note ?? null) : state.note,
+        },
         outbox,
         colors: parseJson(r.colors_json, teamColorsSchema),
         finalizedAt: r.finalized_at,
@@ -474,6 +479,12 @@ export function createRepo(db: Db) {
 }
 
 export type Repo = ReturnType<typeof createRepo>;
+
+/**
+ * Set once a server refused a game note because the app token is not a personal one, so
+ * other games of that server stop offering the note. Cleared when the server is paired again.
+ */
+export const noteRefusedKey = (serverId: number) => `noteRefused:${serverId}`;
 
 /** The "Start of point after a goal" setting; on unless explicitly turned off. */
 export const AUTO_POINT_KEY = 'autoPoint';

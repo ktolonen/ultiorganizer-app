@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { fetchEntryContext, sendRequest, type Credentials } from '../api/http';
 import { credentialsForGame } from '../services/session';
+import { noteRefusedKey } from '../store/repo';
 import { getRepo } from '../store/sqlite';
 import {
   keepServerVersion,
@@ -162,6 +163,13 @@ export function useGame(serverId: number, gameId: number): GameHandle {
       live = false;
     };
   }, [conflictCode, gameId]);
+
+  // A note refused for want of a personal app token: remember it for the server's other games.
+  const noteRefused = session?.outbox.noteRefused;
+  useEffect(() => {
+    if (noteRefused !== 'user_token_required') return;
+    void getRepo().then((r) => r.setSetting(noteRefusedKey(serverId), '1'));
+  }, [noteRefused, serverId]);
 
   // A correction the server could not make through its live route: upload the whole game.
   const needsUpload = paused?.reason === 'needs_upload';

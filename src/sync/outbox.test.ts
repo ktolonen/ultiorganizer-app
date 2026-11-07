@@ -501,3 +501,33 @@ describe('corrections', () => {
     expect(s.rows.map((r) => r.op)).toEqual(['upload']);
   });
 });
+
+describe('note', () => {
+  const note = (s: OutboxState) => add(s, { type: 'note', text: ' Hi ' });
+  it('puts the trimmed text', () => {
+    expect(nextToSend(note(fresh()), 0)).toMatchObject({
+      method: 'PUT',
+      path: '/games/123/note',
+      body: { text: 'Hi' },
+    });
+  });
+  it('a refusal for want of a personal token settles the row and the queue goes on', () => {
+    const s = step(add(note(fresh()), goalEv(5)), {
+      kind: 'http',
+      status: 403,
+      code: 'user_token_required',
+    }).state;
+    expect(s.paused).toBeNull();
+    expect(s.noteRefused).toBe('user_token_required');
+    expect(s.rows[0]).toMatchObject({ status: 'sent', skipped: true });
+    expect(nextToSend(s, 0)?.path).toBe('/games/123/goals');
+  });
+  it('a server without the route settles it too', () => {
+    const s = step(note(fresh()), { kind: 'http', status: 404, code: 'not_found' }).state;
+    expect(s.noteRefused).toBe('absent');
+  });
+  it('a full upload keeps an unsent note ahead of it', () => {
+    const s = enqueueUpload(note(fresh()), doc, key(), 0)!;
+    expect(s.rows.map((r) => r.op)).toEqual(['note', 'upload']);
+  });
+});

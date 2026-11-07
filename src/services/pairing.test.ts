@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { type Db, migrate } from '../store/migrations';
-import { createRepo } from '../store/repo';
+import { createRepo, noteRefusedKey } from '../store/repo';
 import en from '../i18n/locales/en.app.json';
 import { pairErrorKey, pairServer, type PairError } from './pairing';
 
@@ -44,6 +44,20 @@ describe('pairServer', () => {
     expect(fetch.mock.calls[0][0]).toBe('https://example.org/uo/api/v1/version');
     expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer tok');
   });
+  it('pairing again offers game notes again', async () => {
+    const { repo, saveToken } = await setup();
+    await pairServer(
+      { root: 'https://example.org/uo', token: 'a' },
+      { repo, saveToken, fetch: reply(200) },
+    );
+    await repo.setSetting(noteRefusedKey(1), '1');
+    await pairServer(
+      { root: 'https://example.org/uo', token: 'b' },
+      { repo, saveToken, fetch: reply(200) },
+    );
+    expect(await repo.getSetting(noteRefusedKey(1))).toBe('');
+  });
+
   it('stores nothing when the token is rejected', async () => {
     const { repo, saved, saveToken } = await setup();
     expect(

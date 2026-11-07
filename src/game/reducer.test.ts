@@ -10,6 +10,7 @@ import {
   replay,
   suggestedPointCap,
   timeoutsLeft,
+  utf8Bytes,
 } from './reducer';
 import { entryContextSchema } from './types';
 import { toGameData } from './upload';
@@ -460,5 +461,24 @@ describe('correct_goal', () => {
       assistId: null,
     });
     expect(reduce(s, fix(1, 1, 2))).toEqual({ ok: true, state: s });
+  });
+});
+
+describe('note', () => {
+  it('trims, clears on an empty text, and is allowed on a final game', () => {
+    const s = must(base(), { type: 'note', text: '  Wind from the north ' });
+    expect(s.note).toBe('Wind from the north');
+    expect(must(s, { type: 'note', text: '   ' }).note).toBeNull();
+    const final = must(must(base(), goal('home', 1, 2, 5)), { type: 'finalize' });
+    expect(must(final, { type: 'note', text: 'ok' }).note).toBe('ok');
+  });
+  it('counts the limit in UTF-8 bytes, as the server does', () => {
+    expect(code(base(), { type: 'note', text: 'a'.repeat(4000) })).toBe('ok');
+    expect(code(base(), { type: 'note', text: 'ä'.repeat(2001) })).toBe('note_too_long:text');
+    expect(utf8Bytes('aä€😀')).toBe(1 + 2 + 3 + 4);
+  });
+  it('takes the note from the entry context', () => {
+    expect(base({ note: 'Hi' }).note).toBe('Hi');
+    expect(base().note).toBeNull();
   });
 });

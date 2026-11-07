@@ -61,6 +61,10 @@ export function applyEvent(session: GameSession, event: GameEvent, deps: Deps): 
     return removeStoppage(session, event, state, deps);
   }
   if (event.type === 'correct_goal') return correctGoal(session, event, state, deps);
+  // A server that refused notes keeps them on the phone only.
+  if (event.type === 'note' && session.outbox.noteRefused) {
+    return { ok: true, session: { ...session, state } };
+  }
   // A server without the caps route keeps caps on the phone only.
   if ((event.type === 'cap' || event.type === 'remove_cap') && session.outbox.capsAbsent) {
     return { ok: true, session: { ...session, state } };
