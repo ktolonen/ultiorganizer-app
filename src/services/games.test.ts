@@ -250,6 +250,23 @@ describe('saved server data', () => {
     expect(await prefetch(d, fetch, [1], 1000 + PREFETCH_FRESH_MS)).toBe(1);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+  it('asks If-None-Match for a saved context and keeps it on 304', async () => {
+    const d = await setup();
+    const first = jest.fn(() =>
+      Promise.resolve(new Response(JSON.stringify(ctxFor(1)), { headers: { ETag: '"tok0-abc"' } })),
+    );
+    expect(await prefetch(d, first, [1], 1000)).toBe(1);
+    expect((await d.repo.cachedContext(d.server.id, 1))?.etag).toBe('"tok0-abc"');
+    const later = 1000 + PREFETCH_FRESH_MS;
+    const same = jest.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve(new Response(null, { status: 304 })),
+    );
+    expect(await prefetch(d, same, [1], later)).toBe(0);
+    expect(same.mock.calls[0][1].headers).toMatchObject({ 'If-None-Match': '"tok0-abc"' });
+    const kept = await d.repo.cachedContext(d.server.id, 1);
+    expect(kept).toMatchObject({ fetchedAt: later, etag: '"tok0-abc"' });
+    expect(kept?.context.game.game_id).toBe(1);
+  });
   it('skips a missing game but stops at a network failure or a refused link', async () => {
     const d = await setup();
     const answers = [

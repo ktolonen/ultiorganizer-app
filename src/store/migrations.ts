@@ -68,6 +68,8 @@ export const MIGRATIONS: readonly string[] = [
   // The reserved row local games belong to (LOCAL_SERVER_ID in src/game/local.ts). Its root
   // is not a URL, so no pairing or scan can match it; server lists leave it out.
   `INSERT INTO servers (id, root, label, created_at) VALUES (0, 'local:', 'This phone', 0);`,
+  // The entry context's ETag, so a refresh of saved data can ask If-None-Match.
+  `ALTER TABLE cached_contexts ADD COLUMN etag TEXT;`,
 ];
 
 /** The minimal database surface the store needs; `expo-sqlite` and test fakes both fit. */

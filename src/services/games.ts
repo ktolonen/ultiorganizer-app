@@ -136,10 +136,17 @@ export async function prefetchContexts(deps: {
     if (await deps.repo.hasGame(deps.serverId, gameId)) continue;
     const recent = await deps.repo.cachedContext(deps.serverId, gameId);
     if (recent && deps.now() - recent.fetchedAt < PREFETCH_FRESH_MS) continue;
-    const res = await fetchEntryContext(deps.creds, gameId, { fetch: deps.fetch });
+    // A saved context with an ETag is asked If-None-Match: an unchanged one answers 304
+    // without a body. It still counts against the rate limit, so it saves transfer only.
+    const res = await fetchEntryContext(deps.creds, gameId, {
+      fetch: deps.fetch,
+      headers: recent?.etag ? { 'If-None-Match': recent.etag } : undefined,
+    });
     if (res.ok) {
-      await deps.repo.cacheContext(deps.serverId, res.data, deps.now());
+      await deps.repo.cacheContext(deps.serverId, res.data, deps.now(), res.etag);
       saved++;
+    } else if (res.kind === 'http' && res.status === 304) {
+      await deps.repo.touchCachedContext(deps.serverId, gameId, deps.now());
     } else if (res.kind === 'network' || (res.kind === 'http' && res.status !== 404)) {
       break;
     }

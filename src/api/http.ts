@@ -148,7 +148,8 @@ export async function sendRequest(
 /* ------------------------------------------------------------------ */
 
 export type ReadResult<T> =
-  | { ok: true; data: T }
+  /** `etag`: the response's ETag as sent (quoted), for a later `If-None-Match`. */
+  | { ok: true; data: T; etag?: string }
   | { ok: false; kind: 'network' }
   | { ok: false; kind: 'http'; status: number; code: string }
   | { ok: false; kind: 'bad_body' };
@@ -184,6 +185,8 @@ async function read<T>(
     } catch {
       /* fall through */
     }
+    // Only sent with If-None-Match: what is saved is still current.
+    if (res.status === 304) return { ok: false, kind: 'http', status: 304, code: 'not_modified' };
     if (!res.ok) {
       const err = errorBody.safeParse(json);
       return {
@@ -194,7 +197,8 @@ async function read<T>(
       };
     }
     const data = pick(json);
-    return data === null ? { ok: false, kind: 'bad_body' } : { ok: true, data };
+    const etag = res.headers?.get('ETag') ?? undefined;
+    return data === null ? { ok: false, kind: 'bad_body' } : { ok: true, data, etag };
   } catch {
     return { ok: false, kind: 'network' };
   } finally {

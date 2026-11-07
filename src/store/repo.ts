@@ -313,29 +313,44 @@ export function createRepo(db: Db) {
       return r && data ? { data, fetchedAt: r.fetched_at } : null;
     },
 
-    async cacheContext(serverId: number, context: EntryContext, now: number) {
+    async cacheContext(serverId: number, context: EntryContext, now: number, etag?: string) {
       await db.runAsync(
-        `INSERT INTO cached_contexts (server_id, game_id, context_json, fetched_at) VALUES (?, ?, ?, ?)
+        `INSERT INTO cached_contexts (server_id, game_id, context_json, fetched_at, etag) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(server_id, game_id) DO UPDATE SET
-           context_json = excluded.context_json, fetched_at = excluded.fetched_at`,
+           context_json = excluded.context_json, fetched_at = excluded.fetched_at, etag = excluded.etag`,
         serverId,
         context.game.game_id,
         JSON.stringify(context),
         now,
+        etag ?? null,
+      );
+    },
+
+    /** The server answered 304 for a saved context: it is current as of `now`. */
+    async touchCachedContext(serverId: number, gameId: number, now: number) {
+      await db.runAsync(
+        'UPDATE cached_contexts SET fetched_at = ? WHERE server_id = ? AND game_id = ?',
+        now,
+        serverId,
+        gameId,
       );
     },
 
     async cachedContext(
       serverId: number,
       gameId: number,
-    ): Promise<{ context: EntryContext; fetchedAt: number } | null> {
-      const r = await db.getFirstAsync<{ context_json: string; fetched_at: number }>(
-        'SELECT context_json, fetched_at FROM cached_contexts WHERE server_id = ? AND game_id = ?',
+    ): Promise<{ context: EntryContext; fetchedAt: number; etag: string | null } | null> {
+      const r = await db.getFirstAsync<{
+        context_json: string;
+        fetched_at: number;
+        etag: string | null;
+      }>(
+        'SELECT context_json, fetched_at, etag FROM cached_contexts WHERE server_id = ? AND game_id = ?',
         serverId,
         gameId,
       );
       const context = parseJson(r?.context_json, entryContextSchema);
-      return r && context ? { context, fetchedAt: r.fetched_at } : null;
+      return r && context ? { context, fetchedAt: r.fetched_at, etag: r.etag } : null;
     },
 
     /** Called once a game is on the phone: from then on its own row is the source of truth. */
