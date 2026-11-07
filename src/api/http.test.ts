@@ -37,7 +37,7 @@ describe('sendRequest', () => {
       kind: 'ok',
       token: 't1',
       result: { home: 1, away: 0, state: 'ongoing' },
-      goalNum: 4,
+      num: 4,
     });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://example.org/uo/api/v1/games/123/goals');
@@ -220,5 +220,35 @@ describe('probeFromStatus', () => {
     expect(probeFromStatus(500)).toBe('unknown');
     expect(probeFromStatus(401)).toBe('unknown');
     expect(probeFromStatus(null)).toBe('unknown');
+  });
+});
+
+describe('write answers of the newer routes', () => {
+  const creds = { root: 'https://example.org/uo', appToken: 'app-token' };
+  const answer = (data: object) =>
+    jest
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ status: 'ok', data: { game_id: 1, token: 't', result: null, ...data } }),
+        ),
+      );
+  const send = (fetchMock: jest.Mock) =>
+    sendRequest(creds, { key: 'k', method: 'POST', path: '/x', body: null }, { fetch: fetchMock });
+  it('takes the number of a created timeout or spirit stoppage', async () => {
+    expect(await send(answer({ timeout: { side: 'home', num: 3, time: 5 } }))).toMatchObject({
+      num: 3,
+    });
+    expect(
+      await send(answer({ spirit_stoppage: { side: 'away', num: 1, time: 5 } })),
+    ).toMatchObject({
+      num: 1,
+    });
+  });
+  it('takes the clock and the note', async () => {
+    expect(await send(answer({ clock: { state: 'paused', elapsed: 61 } }))).toMatchObject({
+      clock: { state: 'paused', elapsed: 61 },
+    });
+    expect(await send(answer({ note: null }))).toMatchObject({ note: null });
   });
 });

@@ -61,9 +61,20 @@ export type GameEvent =
       time: number | null;
     }
   | { type: 'delete_last_goal'; num: number }
+  /** Corrects a recorded goal's scorer, assist and Callahan flag; side, time and score stay. */
+  | {
+      type: 'correct_goal';
+      num: number;
+      scorerId: number | null;
+      assistId: number | null;
+      callahan: boolean;
+    }
   | { type: 'timeout'; side: Side; time: number }
   | { type: 'spirit_stoppage'; side: Side; time: number }
-  /** Local correction of an older entry. The live API cannot delete these, so it syncs by full upload. */
+  /**
+   * Removes a timeout or spirit stoppage. The team's last one syncs through its delete
+   * route; an older one only by full upload.
+   */
   | { type: 'remove_timeout'; side: Side; index: number }
   | { type: 'remove_spirit_stoppage'; side: Side; index: number }
   | { type: 'score_tap'; side: Side; delta: 1 | -1 }
@@ -268,6 +279,40 @@ function reduceDeleteLast(
   return ok({ ...state, goals, result });
 }
 
+// Like the server's PATCH goals/{num}: allowed on a final game, since the result does not
+// change, and only a player being changed needs to be on the game roster.
+function reduceCorrectGoal(
+  state: GameState,
+  e: Extract<GameEvent, { type: 'correct_goal' }>,
+): Reduced {
+  const idx = state.goals.findIndex((g) => g.num === e.num);
+  if (idx < 0) return fail('validation_failed', 'No such goal.', 'num');
+  const goal = state.goals[idx];
+  const assistId = e.callahan ? null : e.assistId;
+  if (e.callahan && e.assistId !== null) {
+    return fail('validation_failed', 'A Callahan goal has no assist.', 'assist_id');
+  }
+  if (e.scorerId !== null && e.scorerId === assistId) {
+    return fail('validation_failed', 'Scorer and assist must differ.', 'assist_id');
+  }
+  if (
+    e.scorerId !== goal.scorerId &&
+    e.scorerId !== null &&
+    !onRoster(state, goal.side, e.scorerId)
+  ) {
+    return fail('validation_failed', 'The scorer is not on the roster.', 'scorer_id');
+  }
+  if (assistId !== goal.assistId && assistId !== null && !onRoster(state, goal.side, assistId)) {
+    return fail('validation_failed', 'The assist is not on the roster.', 'assist_id');
+  }
+  if (e.scorerId === goal.scorerId && assistId === goal.assistId && e.callahan === goal.callahan) {
+    return ok(state);
+  }
+  const goals = [...state.goals];
+  goals[idx] = { ...goal, scorerId: e.scorerId, assistId, callahan: e.callahan };
+  return ok({ ...state, goals });
+}
+
 function reduceStoppage(
   state: GameState,
   e: Extract<GameEvent, { type: 'timeout' | 'spirit_stoppage' }>,
@@ -411,6 +456,8 @@ export function reduce(state: GameState, event: GameEvent): Reduced {
       return reduceGoal(state, event);
     case 'delete_last_goal':
       return reduceDeleteLast(state, event);
+    case 'correct_goal':
+      return reduceCorrectGoal(state, event);
     case 'timeout':
     case 'spirit_stoppage':
       return reduceStoppage(state, event);

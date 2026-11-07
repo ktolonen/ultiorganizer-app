@@ -507,7 +507,7 @@ export interface paths {
         };
         /**
          * Everything the scorekeeping app needs to keep one game
-         * @description One consistent read, taking no lock: game, both teams' eligible players and game rosters, goals, timeouts, spirit stoppages, result, starting offence, halftime, official, the rules, the state an upload keeps (cap events, forfeit, defences) and the concurrency token, also sent as the strong ETag. It contains no game notes, contact data or history. Goals carry num, home_score and away_score, which are derived by the server and must not be sent in an upload.
+         * @description One consistent read, taking no lock: game, both teams' eligible players and game rosters, goals, timeouts, spirit stoppages, the game clock (null while the event hides times; state not_started, running, paused or stopped, and elapsed seconds as of the response), the game note (only for a user-scoped token, else null), result, starting offence, halftime, official, the rules, the state an upload keeps (cap events, forfeit, defences) and the concurrency token. It contains no contact data or history. Goals carry num, home_score and away_score, which are derived by the server and must not be sent in an upload. The ETag is the token followed by a dash and a hash of the whole context, so it changes with anything in it, the clock included; If-None-Match with it answers 304 Not Modified while nothing changed. If-Match on the upload accepts either the token or this ETag.
          */
         get: {
             parameters: {
@@ -515,6 +515,8 @@ export interface paths {
                 header: {
                     /** @description Scorekeeping link token from the QR code. */
                     "X-Scorekeeping-Token": string;
+                    /** @description The ETag of an earlier entry context; 304 when it still matches. */
+                    "If-None-Match"?: string;
                 };
                 path: {
                     game_id: number;
@@ -526,13 +528,22 @@ export interface paths {
                 /** @description Entry context */
                 200: {
                     headers: {
-                        /** @description The token, quoted. */
+                        /** @description The token, a dash and 32 hex characters of a hash of the whole context, quoted. */
                         ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": Record<string, never>;
                     };
+                };
+                /** @description Not modified: the entry context still matches If-None-Match. No body. */
+                304: {
+                    headers: {
+                        /** @description The same ETag, quoted. */
+                        ETag?: string;
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Missing or invalid app token or scorekeeping link */
                 401: {
@@ -1090,7 +1101,152 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Correct a goal's scorer, assist or Callahan flag
+         * @description Changes scorer_id, assist_id or callahan of goal num; the fields not sent keep their stored value. Side, time and the running score stay; the complete upload changes those. Scorer and assist must be on the goal side's game roster, a Callahan goal has no assist, and scorer and assist differ (400 validation_failed). Allowed on a final game, since the result does not change. Answers with the stored goal.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Client-chosen key, 1 to 64 printable ASCII characters. Resend the same key after a network error. */
+                    "Idempotency-Key": string;
+                    /** @description Scorekeeping link token from the QR code. */
+                    "X-Scorekeeping-Token": string;
+                };
+                path: {
+                    game_id: number;
+                    num: number;
+                };
+                cookie?: never;
+            };
+            /** @description Content-Type application/json. */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GoalCorrection"];
+                };
+            };
+            responses: {
+                /** @description Corrected or replayed */
+                200: {
+                    headers: {
+                        /** @description The resulting token, quoted. */
+                        ETag?: string;
+                        /** @description Present on a replay. */
+                        "Idempotent-Replay"?: "true";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "status": "ok",
+                         *       "data": {
+                         *         "game_id": 1,
+                         *         "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                         *         "result": {
+                         *           "home": 7,
+                         *           "away": 5,
+                         *           "state": "ongoing"
+                         *         },
+                         *         "goal": {
+                         *           "num": 3,
+                         *           "side": "home",
+                         *           "scorer_id": 10,
+                         *           "assist_id": 11,
+                         *           "callahan": false,
+                         *           "time": 600,
+                         *           "home_score": 2,
+                         *           "away_score": 1
+                         *         }
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["WriteResult"];
+                    };
+                };
+                /** @description Invalid body (invalid_body or validation_failed with field paths), missing or malformed Idempotency-Key, invalid JSON */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing or invalid app token or scorekeeping link */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Game not found, or goal_not_found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Wrong method; the Allow header names the right one */
+                405: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description idempotency_conflict or forfeit */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit exceeded */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unexpected failure; nothing was saved */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Event under maintenance, or busy after two retries (Retry-After) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/v1/games/{game_id}/timeouts": {
@@ -2417,6 +2573,613 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/timeouts/{side}/{num}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a team's last timeout
+         * @description Deletes the team's timeout num while it is still the team's last one (409 timeout_changed otherwise, such as after another device added one). No body.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Client-chosen key, 1 to 64 printable ASCII characters. Resend the same key after a network error. */
+                    "Idempotency-Key": string;
+                    /** @description Scorekeeping link token from the QR code. */
+                    "X-Scorekeeping-Token": string;
+                };
+                path: {
+                    game_id: number;
+                    side: "home" | "away";
+                    num: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted or replayed */
+                200: {
+                    headers: {
+                        /** @description The resulting token, quoted. */
+                        ETag?: string;
+                        /** @description Present on a replay. */
+                        "Idempotent-Replay"?: "true";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "status": "ok",
+                         *       "data": {
+                         *         "game_id": 1,
+                         *         "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                         *         "result": {
+                         *           "home": 7,
+                         *           "away": 5,
+                         *           "state": "ongoing"
+                         *         },
+                         *         "deleted": {
+                         *           "side": "home",
+                         *           "num": 2
+                         *         }
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["WriteResult"];
+                    };
+                };
+                /** @description Missing or malformed Idempotency-Key */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing or invalid app token or scorekeeping link */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Game not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Wrong method; the Allow header names the right one */
+                405: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description idempotency_conflict, forfeit, or timeout_changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit exceeded */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unexpected failure; nothing was saved */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Event under maintenance, or busy after two retries (Retry-After) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/spirit-stoppages/{side}/{num}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a team's last spirit stoppage
+         * @description Deletes the team's spirit stoppage num while it is still the team's last one (409 spirit_stoppage_changed otherwise, such as after another device added one). No body.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Client-chosen key, 1 to 64 printable ASCII characters. Resend the same key after a network error. */
+                    "Idempotency-Key": string;
+                    /** @description Scorekeeping link token from the QR code. */
+                    "X-Scorekeeping-Token": string;
+                };
+                path: {
+                    game_id: number;
+                    side: "home" | "away";
+                    num: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted or replayed */
+                200: {
+                    headers: {
+                        /** @description The resulting token, quoted. */
+                        ETag?: string;
+                        /** @description Present on a replay. */
+                        "Idempotent-Replay"?: "true";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "status": "ok",
+                         *       "data": {
+                         *         "game_id": 1,
+                         *         "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                         *         "result": {
+                         *           "home": 7,
+                         *           "away": 5,
+                         *           "state": "ongoing"
+                         *         },
+                         *         "deleted": {
+                         *           "side": "home",
+                         *           "num": 2
+                         *         }
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["WriteResult"];
+                    };
+                };
+                /** @description Missing or malformed Idempotency-Key */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing or invalid app token or scorekeeping link */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Game not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Wrong method; the Allow header names the right one */
+                405: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description idempotency_conflict, forfeit, or spirit_stoppage_changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit exceeded */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unexpected failure; nothing was saved */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Event under maintenance, or busy after two retries (Retry-After) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/clock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start, pause, resume, set or reset the game clock
+         * @description Works the game clock as the Scorekeeper clock controls do. start needs a clock that is not running or paused (409 clock_running) and makes the game ongoing; pause needs a running clock (409 clock_not_running); resume and set need a paused one (409 clock_not_paused), and set takes elapsed in seconds; reset needs a 0 - 0 score (409 score_not_zero) and returns the game to not started. A final game is 409 game_final, and while the event hides times the clock is not kept (409 times_hidden). Answers with the resulting clock, as in the entry context.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Client-chosen key, 1 to 64 printable ASCII characters. Resend the same key after a network error. */
+                    "Idempotency-Key": string;
+                    /** @description Scorekeeping link token from the QR code. */
+                    "X-Scorekeeping-Token": string;
+                };
+                path: {
+                    game_id: number;
+                };
+                cookie?: never;
+            };
+            /** @description Content-Type application/json. */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ClockChange"];
+                };
+            };
+            responses: {
+                /** @description Changed or replayed */
+                200: {
+                    headers: {
+                        /** @description The resulting token, quoted. */
+                        ETag?: string;
+                        /** @description Present on a replay. */
+                        "Idempotent-Replay"?: "true";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "status": "ok",
+                         *       "data": {
+                         *         "game_id": 1,
+                         *         "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                         *         "result": {
+                         *           "home": 7,
+                         *           "away": 5,
+                         *           "state": "ongoing"
+                         *         },
+                         *         "clock": {
+                         *           "state": "paused",
+                         *           "elapsed": 1260
+                         *         }
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["WriteResult"];
+                    };
+                };
+                /** @description Invalid body (invalid_body or validation_failed with field paths), missing or malformed Idempotency-Key, invalid JSON */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing or invalid app token or scorekeeping link */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Game not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Wrong method; the Allow header names the right one */
+                405: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description idempotency_conflict, forfeit, game_final, times_hidden, clock_running, clock_not_running, clock_not_paused, or score_not_zero */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit exceeded */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unexpected failure; nothing was saved */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Event under maintenance, or busy after two retries (Retry-After) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set or clear the game note
+         * @description Sets the game note, or clears it with an empty text, as the Scorekeeper note page does. Needs a personal (user-scoped) app token (403 user_token_required), because the browser offers notes only to a logged-in user; the note is attributed to the token's user. Answers with the stored note, null when cleared.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Client-chosen key, 1 to 64 printable ASCII characters. Resend the same key after a network error. */
+                    "Idempotency-Key": string;
+                    /** @description Scorekeeping link token from the QR code. */
+                    "X-Scorekeeping-Token": string;
+                };
+                path: {
+                    game_id: number;
+                };
+                cookie?: never;
+            };
+            /** @description Content-Type application/json. */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GameNote"];
+                };
+            };
+            responses: {
+                /** @description Saved or replayed */
+                200: {
+                    headers: {
+                        /** @description The resulting token, quoted. */
+                        ETag?: string;
+                        /** @description Present on a replay. */
+                        "Idempotent-Replay"?: "true";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "status": "ok",
+                         *       "data": {
+                         *         "game_id": 1,
+                         *         "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                         *         "result": {
+                         *           "home": 7,
+                         *           "away": 5,
+                         *           "state": "ongoing"
+                         *         },
+                         *         "note": "Play stopped for 10 minutes because of rain."
+                         *       }
+                         *     }
+                         */
+                        "application/json": components["schemas"]["WriteResult"];
+                    };
+                };
+                /** @description Invalid body (invalid_body or validation_failed with field paths), missing or malformed Idempotency-Key, invalid JSON */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing or invalid app token or scorekeeping link */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, event read-only, or user_token_required */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Game not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Wrong method; the Allow header names the right one */
+                405: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description idempotency_conflict or forfeit */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit exceeded */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Unexpected failure; nothing was saved */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Event under maintenance, or busy after two retries (Retry-After) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2593,6 +3356,22 @@ export interface components {
             time: number;
             /** @description The new point cap. A new cap must exceed the higher score; a correction of a recorded cap may be any value from 1. */
             point_cap: number;
+        };
+        /** @description Send at least one field; the others keep their stored value. */
+        GoalCorrection: {
+            scorer_id?: number | null;
+            assist_id?: number | null;
+            callahan?: boolean;
+        };
+        ClockChange: {
+            /** @enum {string} */
+            action: "start" | "pause" | "resume" | "set" | "reset";
+            /** @description Seconds; required for set and refused for the other actions. */
+            elapsed?: number;
+        };
+        GameNote: {
+            /** @description Trimmed; an empty text clears the note. At most 4000 bytes. */
+            text: string;
         };
     };
     responses: never;

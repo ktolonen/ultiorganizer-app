@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
   CAP_TYPES,
@@ -54,6 +54,8 @@ export default function GameScreen() {
   );
   const [tab, setTab] = useState<Tab>('live');
   const [goalSide, setGoalSide] = useState<Side | null>(null);
+  // The goal being corrected on the Sheet tab, by its number on this phone.
+  const [fixNum, setFixNum] = useState<number | null>(null);
   const [asking, setAsking] = useState<Asking>(null);
   const [confirmFinal, setConfirmFinal] = useState(false);
   const [capOpen, setCapOpen] = useState<CapType | null>(null);
@@ -201,6 +203,8 @@ export default function GameScreen() {
         : null;
   const offerCap = noticeCap && !state.caps[noticeCap] ? noticeCap : null;
 
+  const fixGoal = fixNum !== null ? state.goals.find((g) => g.num === fixNum) : undefined;
+
   const synced = isFullySynced(outbox);
   const failedRow = outbox.rows.find((r) => r.status === 'failed');
 
@@ -316,9 +320,22 @@ export default function GameScreen() {
             disabled={state.goals.length === 0 || isFinal}
             onPress={() => report(game.undoGoal())}
           />
-          {state.goals.map((g) => (
-            <Txt key={g.num}>{goalLine(g)}</Txt>
-          ))}
+          {state.goals.map((g) =>
+            // A goal of a side with a roster can be corrected: tap it to pick the players again.
+            hasRoster(g.side) ? (
+              <Pressable
+                key={g.num}
+                accessibilityRole="button"
+                accessibilityHint={t('game.correctGoalHint')}
+                onPress={() => setFixNum(g.num)}
+                style={{ minHeight: TARGET.min, justifyContent: 'center' }}
+              >
+                <Txt style={{ textDecorationLine: 'underline' }}>{goalLine(g)}</Txt>
+              </Pressable>
+            ) : (
+              <Txt key={g.num}>{goalLine(g)}</Txt>
+            ),
+          )}
           <Divider />
           {(['home', 'away'] as const).map((side) => (
             <View key={side} style={{ gap: 4 }}>
@@ -340,6 +357,14 @@ export default function GameScreen() {
                   {state.spiritStoppages[side].map((x) => formatTime(x.time)).join(', ') || '–'}
                 </Txt>
               )}
+              {state.spiritStoppages[side].map((x, i) => (
+                <Button
+                  key={`s${i}-${x.time}`}
+                  label={`${t('game.removeSpirit')} ${formatTime(x.time)}`}
+                  kind="secondary"
+                  onPress={() => apply({ type: 'remove_spirit_stoppage', side, index: i })}
+                />
+              ))}
             </View>
           ))}
           <Divider />
@@ -442,6 +467,20 @@ export default function GameScreen() {
         onSave={saveGoal}
         onClose={() => setGoalSide(null)}
       />
+
+      {fixGoal && (
+        <GoalSheet
+          visible
+          side={fixGoal.side}
+          teamName={`${t('game.correctGoal', { num: fixGoal.num })} · ${names[fixGoal.side]}`}
+          state={state}
+          onSave={(goal) => {
+            setFixNum(null);
+            apply({ type: 'correct_goal', num: fixGoal.num, ...goal });
+          }}
+          onClose={() => setFixNum(null)}
+        />
+      )}
 
       {capOpen && (
         <CapSheet

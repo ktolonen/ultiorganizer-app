@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entryContextSchema, type EntryContext } from '../game/types';
+import { clockSchema, entryContextSchema, type EntryContext } from '../game/types';
 import type { Response as OutboxResponse, SendRequest } from '../sync/outbox';
 
 /**
@@ -55,6 +55,10 @@ const writeBody = z.object({
       })
       .nullable(),
     goal: z.object({ num: z.number().int() }).optional(),
+    timeout: z.object({ num: z.number().int() }).optional(),
+    spirit_stoppage: z.object({ num: z.number().int() }).optional(),
+    clock: clockSchema.optional(),
+    note: z.string().nullable().optional(),
   }),
 });
 
@@ -89,11 +93,14 @@ export async function toOutboxResponse(res: Response, nowMs: number): Promise<Ou
       // key, which the server's idempotency receipt makes safe.
       return { kind: 'network' };
     }
+    const d = parsed.data.data;
     return {
       kind: 'ok',
-      token: parsed.data.data.token,
-      result: parsed.data.data.result,
-      goalNum: parsed.data.data.goal?.num,
+      token: d.token,
+      result: d.result,
+      num: (d.goal ?? d.timeout ?? d.spirit_stoppage)?.num,
+      clock: d.clock,
+      note: d.note,
     };
   }
   const err = errorBody.safeParse(json);

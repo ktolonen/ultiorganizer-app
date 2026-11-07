@@ -29,6 +29,9 @@ const row = z.object({
     'finalize',
     'cap',
     'remove_cap',
+    'correct_goal',
+    'delete_timeout',
+    'delete_spirit_stoppage',
     'upload',
   ]),
   event: z
@@ -45,6 +48,7 @@ const row = z.object({
   attempts: z.number().int(),
   createdAt: z.number(),
   serverNum: z.number().int().optional(),
+  localNum: z.number().int().optional(),
   skipped: z.boolean().optional(),
   error: z
     .object({
@@ -61,7 +65,7 @@ export const outboxSchema: z.ZodType<OutboxState> = z.object({
   rows: z.array(row),
   paused: z
     .object({
-      reason: z.enum(['conflict', 'auth', 'failed']),
+      reason: z.enum(['conflict', 'auth', 'failed', 'needs_upload']),
       rowKey: z.string().nullable(),
       code: z.string(),
     })
@@ -72,6 +76,7 @@ export const outboxSchema: z.ZodType<OutboxState> = z.object({
   offline: z.boolean(),
   offlineOnly: z.boolean(),
   capsAbsent: z.boolean().optional(),
+  correctionsAbsent: z.boolean().optional(),
 }) as unknown as z.ZodType<OutboxState>;
 
 const timer = z.object({

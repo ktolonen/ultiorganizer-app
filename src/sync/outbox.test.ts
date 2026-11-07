@@ -5,9 +5,12 @@ import {
   SERVER_ERROR_ATTEMPTS,
   type OutboxState,
   backoffMs,
+  correctGoalRequest,
+  deleteStoppageRequest,
   discardFailed,
   dropRow,
   enqueue,
+  enqueueRequest,
   enqueueUpload,
   isFullySynced,
   keepServerVersion,
@@ -110,12 +113,12 @@ describe('sending', () => {
     expect(first.key).toBe('key-1');
     s = markSending(s, first.key);
     expect(nextToSend(s, 0)).toBeNull(); // in flight
-    s = onResponse(s, first.key, ok('tok1', { goalNum: 1 }), 0);
+    s = onResponse(s, first.key, ok('tok1', { num: 1 }), 0);
     expect(nextToSend(s, 0)!.key).toBe('key-2');
   });
 
   it('stores the token, result and goal number on success', () => {
-    const s = step(add(fresh(), goalEv(1)), ok('tok1', { goalNum: 1 })).state;
+    const s = step(add(fresh(), goalEv(1)), ok('tok1', { num: 1 })).state;
     expect(s.rows[0]).toMatchObject({ status: 'sent', serverNum: 1 });
     expect(s.token).toBe('tok1');
     expect(s.confirmedResult).toEqual({ home: 1, away: 0, state: 'ongoing' });
@@ -314,7 +317,7 @@ describe('finalize', () => {
 
   it('is sent only after earlier rows, with the score the server confirmed', () => {
     let s = finalizeAfterGoal();
-    s = step(s, ok('tok1', { goalNum: 1 })).state;
+    s = step(s, ok('tok1', { num: 1 })).state;
     expect(nextToSend(s, 0)).toMatchObject({
       method: 'POST',
       path: '/games/123/finalize',
@@ -330,15 +333,15 @@ describe('finalize', () => {
   it('reports fully synced only when the outbox is empty', () => {
     let s = finalizeAfterGoal();
     expect(isFullySynced(s)).toBe(false);
-    s = step(s, ok('tok1', { goalNum: 1 })).state;
+    s = step(s, ok('tok1', { num: 1 })).state;
     s = step(s, { kind: 'ok', token: 'tok2', result: { home: 1, away: 0, state: 'final' } }).state;
     expect(isFullySynced(s)).toBe(true);
   });
 });
 
 describe('undo', () => {
-  const sent = (s: OutboxState, ev: GameEvent, goalNum?: number) => {
-    const r = step(add(s, ev), ok('t' + n, goalNum ? { goalNum } : {}));
+  const sent = (s: OutboxState, ev: GameEvent, num?: number) => {
+    const r = step(add(s, ev), ok('t' + n, num ? { num } : {}));
     return r.state;
   };
 
@@ -459,5 +462,42 @@ describe('caps', () => {
   it('undoes a sent cap with a new write', () => {
     const { state } = step(add(fresh(), capEv), ok('tok1'));
     expect(planUndo(state, state.rows[0].key)).toEqual({ kind: 'inverse' });
+  });
+});
+
+describe('corrections', () => {
+  const del = (s: OutboxState) =>
+    enqueueRequest(
+      s,
+      deleteStoppageRequest(123, 'timeout', 'home', 2),
+      { type: 'remove_timeout', side: 'home', index: 1 },
+      key(),
+      0,
+    );
+  it('a stale or unknown entry asks for a full upload, not the conflict sheet', () => {
+    const s = step(del(fresh()), { kind: 'http', status: 409, code: 'timeout_changed' }).state;
+    expect(s.paused).toMatchObject({ reason: 'needs_upload', code: 'timeout_changed' });
+    expect(s.correctionsAbsent).toBeUndefined();
+    expect(syncStatus(s)).toEqual({ kind: 'queued', queued: 1 });
+  });
+  it('a server without the route is remembered', () => {
+    const fix = enqueueRequest(
+      fresh(),
+      correctGoalRequest(123, 1, { scorerId: 3, assistId: null, callahan: false }),
+      { type: 'correct_goal', num: 1, scorerId: 3, assistId: null, callahan: false },
+      key(),
+      0,
+    );
+    const s = step(fix, { kind: 'http', status: 405, code: 'method_not_allowed' }).state;
+    expect(s.paused?.reason).toBe('needs_upload');
+    expect(s.correctionsAbsent).toBe(true);
+  });
+  it('other refusals of a correction still stop the queue', () => {
+    const s = step(del(fresh()), { kind: 'http', status: 400, code: 'validation_failed' }).state;
+    expect(s.paused?.reason).toBe('failed');
+  });
+  it('a full upload replaces unsent corrections', () => {
+    const s = enqueueUpload(del(fresh()), doc, key(), 0)!;
+    expect(s.rows.map((r) => r.op)).toEqual(['upload']);
   });
 });

@@ -16,7 +16,14 @@ import {
 } from '../sync/outbox';
 import { drain } from '../sync/sender';
 import { defaultTeamColors } from '../ui/tokens';
-import { applyEvent, refreshEligible, undoLastGoal, uploadAll, type GameSession } from './runtime';
+import {
+  applyEvent,
+  refreshEligible,
+  resolveNeedsUpload,
+  undoLastGoal,
+  uploadAll,
+  type GameSession,
+} from './runtime';
 import { fromEntryContext, type GameError, type GameEvent } from './reducer';
 import { toGameData } from './upload';
 import type { EntryContext } from './types';
@@ -155,6 +162,15 @@ export function useGame(serverId: number, gameId: number): GameHandle {
       live = false;
     };
   }, [conflictCode, gameId]);
+
+  // A correction the server could not make through its live route: upload the whole game.
+  const needsUpload = paused?.reason === 'needs_upload';
+  useEffect(() => {
+    const cur = ref.current;
+    if (!needsUpload || !cur) return;
+    const next = resolveNeedsUpload(cur, { now: Date.now(), newKey: randomUUID });
+    if (next !== cur) void commit(next).then(() => kick());
+  }, [needsUpload, commit, kick]);
 
   const deps = () => ({ now: Date.now(), newKey: randomUUID });
   const run = (fn: (s: GameSession) => ReturnType<typeof applyEvent>): ActionError | null => {

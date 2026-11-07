@@ -56,6 +56,13 @@ const bySide = z.object({
   away: z.array(z.object({ time: z.number().int() })),
 });
 
+export const clockSchema = z.object({
+  state: z.enum(['not_started', 'running', 'paused', 'stopped']),
+  /** Seconds, as of the response. */
+  elapsed: z.number().int(),
+});
+export type ServerClock = z.infer<typeof clockSchema>;
+
 export const rulesSchema = z.object({
   hide_time_on_scoresheet: z.boolean(),
   timeouts_per_team: z.number().int(),
@@ -87,6 +94,13 @@ export const entryContextSchema = z.object({
   goals: z.array(serverGoal),
   timeouts: bySide,
   spirit_stoppages: bySide,
+  /**
+   * The server's game clock: null while the event hides times. Absent from older
+   * servers and from contexts saved before the clock route existed.
+   */
+  clock: clockSchema.nullable().optional(),
+  /** The game note: only a user-scoped (personal) app token is shown it, otherwise null. */
+  note: z.string().nullable().optional(),
   metadata: z.object({
     starting_offence: sideSchema.nullable(),
     halftime: z.number().int().nullable(),

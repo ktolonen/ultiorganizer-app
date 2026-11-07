@@ -165,5 +165,8 @@
   "local.field": "Field (optional)",
   "local.timeouts": "Timeouts per team",
   "local.start": "Start game",
-  "game.localNote": "Local game: kept on this phone only and never uploaded."
+  "game.localNote": "Local game: kept on this phone only and never uploaded.",
+  "game.correctGoal": "Correct goal {{num}}",
+  "game.correctGoalHint": "Pick the assist and scorer again",
+  "game.removeSpirit": "Remove spirit stoppage"
 }

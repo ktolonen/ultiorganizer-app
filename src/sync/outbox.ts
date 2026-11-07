@@ -1,6 +1,6 @@
 import type { GameEvent } from '../game/reducer';
 import type { GameDataDocument } from '../game/upload';
-import type { GameResult, Side } from '../game/types';
+import type { GameResult, ServerClock, Side } from '../game/types';
 
 /**
  * Per-game outbox. Pure state transitions over JSON, so the store can persist the
@@ -24,6 +24,9 @@ export type RowOp =
   | 'finalize'
   | 'cap'
   | 'remove_cap'
+  | 'correct_goal'
+  | 'delete_timeout'
+  | 'delete_spirit_stoppage'
   | 'upload';
 
 export type RowStatus = 'pending' | 'sending' | 'sent' | 'failed';
@@ -44,15 +47,22 @@ export type OutboxRow = {
   status: RowStatus;
   attempts: number;
   createdAt: number;
-  /** Set when sent. */
+  /** The server's number of the goal, timeout or spirit stoppage this row created; set when sent. */
   serverNum?: number;
+  /** A goal row: the goal's number on this phone when it was recorded. */
+  localNum?: number;
   /** A cap row the server had no route for (it predates caps): settled without being stored. */
   skipped?: boolean;
   /** The refusal of a failed row, or the last server error of a row still being retried. */
   error?: { status: number; code: string; path?: string; message: string };
 };
 
-export type PauseReason = 'conflict' | 'auth' | 'failed';
+/**
+ * `needs_upload`: a correction the live routes could not make (an older server without
+ * the route, or the entry is no longer the team's last). The caller replaces the queue
+ * with a full upload of local state, which carries the correction.
+ */
+export type PauseReason = 'conflict' | 'auth' | 'failed' | 'needs_upload';
 
 export type OutboxState = {
   gameId: number;
@@ -69,6 +79,11 @@ export type OutboxState = {
   offlineOnly: boolean;
   /** The server answered a cap write with "no such route": caps stay on this phone. */
   capsAbsent?: boolean;
+  /**
+   * The server has no route for goal corrections or for deleting a timeout or spirit
+   * stoppage (it predates them): those corrections go straight to a full upload.
+   */
+  correctionsAbsent?: boolean;
 };
 
 export function newOutbox(
@@ -104,7 +119,7 @@ export const backoffMs = (attempts: number): number =>
 
 type RequestContext = { gameId: number; teamIds: Record<Side, number | null> };
 
-type Req = Pick<OutboxRow, 'op' | 'method' | 'path' | 'body'>;
+export type Req = Pick<OutboxRow, 'op' | 'method' | 'path' | 'body'>;
 
 /** Maps a reducer event to its live API request. Returns null for events with no live route. */
 export function requestFor(event: GameEvent, ctx: RequestContext): Req | null {
@@ -181,8 +196,45 @@ export function requestFor(event: GameEvent, ctx: RequestContext): Req | null {
       return { op: 'remove_cap', method: 'DELETE', path: `${base}/caps/${event.cap}`, body: null };
     case 'remove_timeout':
     case 'remove_spirit_stoppage':
-      return null; // no live delete: corrected locally and synced by full upload
+    case 'correct_goal':
+      return null; // need the server's number: see deleteStoppageRequest and correctGoalRequest
   }
+}
+
+/** `DELETE timeouts/{side}/{num}` or `spirit-stoppages/{side}/{num}`: the team's last one only. */
+export function deleteStoppageRequest(
+  gameId: number,
+  kind: 'timeout' | 'spirit_stoppage',
+  side: Side,
+  num: number,
+): Req {
+  return kind === 'timeout'
+    ? {
+        op: 'delete_timeout',
+        method: 'DELETE',
+        path: `/games/${gameId}/timeouts/${side}/${num}`,
+        body: null,
+      }
+    : {
+        op: 'delete_spirit_stoppage',
+        method: 'DELETE',
+        path: `/games/${gameId}/spirit-stoppages/${side}/${num}`,
+        body: null,
+      };
+}
+
+/** `PATCH goals/{num}`: a goal's scorer, assist and Callahan flag; side, time and score stay. */
+export function correctGoalRequest(
+  gameId: number,
+  num: number,
+  goal: { scorerId: number | null; assistId: number | null; callahan: boolean },
+): Req {
+  return {
+    op: 'correct_goal',
+    method: 'PATCH',
+    path: `/games/${gameId}/goals/${num}`,
+    body: { scorer_id: goal.scorerId, assist_id: goal.assistId, callahan: goal.callahan },
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -214,11 +266,30 @@ export function enqueue(
   return { ...state, rows: [...state.rows, newRow(req, event, key, now)] };
 }
 
+/** Appends a row for a request the caller built (corrections that need the server's number). */
+export function enqueueRequest(
+  state: OutboxState,
+  req: Req,
+  event: GameEvent,
+  key: string,
+  now: number,
+): OutboxState {
+  return { ...state, rows: [...state.rows, newRow(req, event, key, now)] };
+}
+
 /** True when a request is in flight; a full upload must wait for it. */
 export const hasInFlight = (state: OutboxState): boolean =>
   state.rows.some((r) => r.status === 'sending');
 
 const isCapOp = (op: RowOp): boolean => op === 'cap' || op === 'remove_cap';
+/** Ops whose data a full upload does not carry: they stay queued ahead of it. */
+const outsideUpload = (op: RowOp): boolean => isCapOp(op);
+/** Corrections that fall back to a full upload when the live route cannot make them. */
+const isCorrectionOp = (op: RowOp): boolean =>
+  op === 'correct_goal' || op === 'delete_timeout' || op === 'delete_spirit_stoppage';
+/** The router's answer for a route it does not have, as opposed to a missing game or goal. */
+const routeMissing = (status: number, code: string): boolean =>
+  (status === 404 && code === 'not_found') || status === 405;
 
 /**
  * Replaces every unsent row with one full upload (`PUT game-data`, `If-Match` =
@@ -235,7 +306,7 @@ export function enqueueUpload(
 ): OutboxState | null {
   if (hasInFlight(state) || state.token === null) return null;
   const kept = state.rows.filter(
-    (r) => r.status === 'sent' || (isCapOp(r.op) && r.status === 'pending'),
+    (r) => r.status === 'sent' || (outsideUpload(r.op) && r.status === 'pending'),
   );
   const req: Req = {
     op: 'upload',
@@ -295,8 +366,12 @@ export type Response =
       token: string | null;
       /** `result` from the body: null before the game starts. */
       result: GameResult | null;
-      /** `goal.num` of a created goal. */
-      goalNum?: number;
+      /** `num` of a created goal, timeout or spirit stoppage. */
+      num?: number;
+      /** The game clock after a clock change. */
+      clock?: ServerClock;
+      /** The stored game note after a note write. */
+      note?: string | null;
     }
   | { kind: 'network' }
   | {
@@ -308,6 +383,12 @@ export type Response =
       retryAfterSec?: number;
     };
 
+/** The entry is no longer the one the phone means (numbering differs, or another device changed it). */
+const STALE_CORRECTION_CODES = new Set([
+  'timeout_changed',
+  'spirit_stoppage_changed',
+  'goal_not_found',
+]);
 const CONFLICT_CODES = new Set(['goal_changed', 'score_changed', 'fixture_changed', 'stale_token']);
 const AUTH_CODES = new Set([
   'invalid_scorekeeping_token',
@@ -340,7 +421,7 @@ export function onResponse(
     const s = update(state, key, (r) => ({
       ...r,
       status: 'sent',
-      serverNum: res.goalNum ?? r.serverNum,
+      serverNum: res.num ?? r.serverNum,
       error: undefined,
     }));
     return {
@@ -356,11 +437,21 @@ export function onResponse(
   const { status, code } = res;
   // A server without caps has no such route. Caps are not part of the token, so the
   // row can be settled and the queue go on; the caps stay on this phone.
-  if (isCapOp(row.op) && ((status === 404 && code === 'not_found') || status === 405)) {
+  if (isCapOp(row.op) && routeMissing(status, code)) {
     return {
       ...update(state, key, (r) => ({ ...r, status: 'sent', skipped: true, error: undefined })),
       capsAbsent: true,
       nextAttemptAt: 0,
+      offline: false,
+    };
+  }
+  // A correction the live route cannot make: the caller replaces the queue with a full
+  // upload, whose If-Match still catches a real conflict.
+  if (isCorrectionOp(row.op) && (routeMissing(status, code) || STALE_CORRECTION_CODES.has(code))) {
+    return {
+      ...update(state, key, (r) => ({ ...r, status: 'pending' })),
+      paused: { reason: 'needs_upload', rowKey: key, code },
+      correctionsAbsent: routeMissing(status, code) ? true : state.correctionsAbsent,
       offline: false,
     };
   }
@@ -509,8 +600,11 @@ export function planUndo(state: OutboxState, key: string): UndoPlan {
     case 'metadata':
     case 'cap':
     case 'remove_cap':
+    case 'correct_goal':
       return { kind: 'inverse' };
     case 'delete_goal':
+    case 'delete_timeout':
+    case 'delete_spirit_stoppage':
     case 'finalize':
     case 'timeout':
     case 'spirit_stoppage':
@@ -545,7 +639,10 @@ export const unsentRows = (state: OutboxState): OutboxRow[] =>
   );
 
 export function syncStatus(state: OutboxState): SyncStatus {
-  if (state.paused) return { kind: 'attention', reason: state.paused.reason };
+  // A needed full upload is queued by the caller at once: nothing for the user to do.
+  if (state.paused && state.paused.reason !== 'needs_upload') {
+    return { kind: 'attention', reason: state.paused.reason };
+  }
   const unsent = unsentRows(state);
   if (state.offline && unsent.length) return { kind: 'offline', queued: unsent.length };
   // Checked before "sending", so each retry does not flicker the status away from the error.

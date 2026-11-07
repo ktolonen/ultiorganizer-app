@@ -417,3 +417,48 @@ describe('caps', () => {
     expect(JSON.stringify(toGameData(s))).not.toMatch(/point_cap|_cap"/);
   });
 });
+
+describe('correct_goal', () => {
+  const fix = (num: number, scorerId: number | null, assistId: number | null, callahan = false) =>
+    ({ type: 'correct_goal', num, scorerId, assistId, callahan }) as GameEvent;
+  const one = () => must(base(), goal('home', 1, 2, 10));
+
+  it('changes the players and keeps side, time and score', () => {
+    const s = must(one(), fix(1, 3, 1));
+    expect(s.goals[0]).toMatchObject({
+      side: 'home',
+      scorerId: 3,
+      assistId: 1,
+      time: 10,
+      homeScore: 1,
+    });
+    expect(s.result).toEqual(one().result);
+  });
+  it('works on a final game, as the server allows', () => {
+    const s = must(one(), { type: 'finalize' });
+    expect(must(s, fix(1, 3, 2)).goals[0].scorerId).toBe(3);
+  });
+  it('refuses a Callahan with an assist, the same player twice, and an unknown goal', () => {
+    expect(code(one(), fix(1, 3, 2, true))).toBe('validation_failed:assist_id');
+    expect(code(one(), fix(1, 2, 2))).toBe('validation_failed:assist_id');
+    expect(code(one(), fix(2, 3, 2))).toBe('validation_failed:num');
+  });
+  it('checks the roster only for a player being changed', () => {
+    expect(code(one(), fix(1, 4, 2))).toBe('validation_failed:scorer_id');
+    // Player 1 left the roster on the server; correcting only the assist still works.
+    const s0 = one();
+    const s = {
+      ...s0,
+      rosters: { ...s0.rosters, home: s0.rosters.home.filter((p) => p.player_id !== 1) },
+    };
+    expect(code(s, fix(1, 1, 3))).toBe('ok');
+  });
+  it('a Callahan correction drops the assist; no change returns the same state', () => {
+    const s = one();
+    expect(must(s, fix(1, 1, null, true)).goals[0]).toMatchObject({
+      callahan: true,
+      assistId: null,
+    });
+    expect(reduce(s, fix(1, 1, 2))).toEqual({ ok: true, state: s });
+  });
+});
