@@ -461,7 +461,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token or token not valid for the event */
+                /** @description Token not valid for the event */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -543,7 +543,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, or game not covered by the link now */
+                /** @description Token not valid for the event, or game not covered by the link now */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -676,7 +676,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -855,7 +855,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -956,7 +956,7 @@ export interface paths {
         post?: never;
         /**
          * Delete the last goal
-         * @description Deletes goal num while it is still the last goal, then lowers the result onto the remaining goals when the result was tracking them. A num that is no longer last (another device added a goal since) is 409 goal_changed. No body.
+         * @description Deletes goal num while it is still the last goal, then lowers the result onto the remaining goals when the result was tracking them. A final game is 409 game_final; correct one with the complete upload. A num that is no longer last (another device added a goal since) is 409 goal_changed. No body.
          */
         delete: {
             parameters: {
@@ -1023,7 +1023,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1050,7 +1050,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description idempotency_conflict, forfeit, or goal_changed */
+                /** @description idempotency_conflict, forfeit, game_final, or goal_changed */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -1177,7 +1177,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1350,7 +1350,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1518,7 +1518,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1686,7 +1686,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1859,7 +1859,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -2028,7 +2028,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -2179,7 +2179,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -2328,7 +2328,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description User-scoped token, token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
+                /** @description Token not valid for the event, game not covered by the link now, no right to edit the game, or event read-only */
                 403: {
                     headers: {
                         [name: string]: unknown;
