@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { discoverySchema, type Discovery } from '../api/http';
 import { capsFromContext, type GameState } from '../game/reducer';
 import { type EntryContext, entryContextSchema } from '../game/types';
 import type { OutboxState } from '../sync/outbox';
@@ -24,6 +25,12 @@ export const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** A saved scorekeeping link is forgotten after this long without being opened. */
 export const LINK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Cached game lists and entry contexts are dropped this long after they were fetched.
+ * They hold player names, so they are not kept longer than a tournament needs.
+ */
+export const CACHE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type LinkRow = {
   id: number;
@@ -250,6 +257,82 @@ export function createRepo(db: Db) {
       );
       for (const g of old) await this.deleteGame(g.server_id, g.game_id);
       return old.map((g) => ({ serverId: g.server_id, gameId: g.game_id }));
+    },
+
+    /* Cached server data -------------------------------------------- */
+
+    async hasGame(serverId: number, gameId: number): Promise<boolean> {
+      const r = await db.getFirstAsync<{ n: number }>(
+        'SELECT COUNT(*) AS n FROM games WHERE server_id = ? AND game_id = ?',
+        serverId,
+        gameId,
+      );
+      return (r?.n ?? 0) > 0;
+    },
+
+    async cacheList(serverId: number, linkHash: string, data: Discovery, now: number) {
+      await db.runAsync(
+        `INSERT INTO cached_lists (server_id, link_hash, discovery_json, fetched_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(server_id, link_hash) DO UPDATE SET
+           discovery_json = excluded.discovery_json, fetched_at = excluded.fetched_at`,
+        serverId,
+        linkHash,
+        JSON.stringify(data),
+        now,
+      );
+    },
+
+    async cachedList(
+      serverId: number,
+      linkHash: string,
+    ): Promise<{ data: Discovery; fetchedAt: number } | null> {
+      const r = await db.getFirstAsync<{ discovery_json: string; fetched_at: number }>(
+        'SELECT discovery_json, fetched_at FROM cached_lists WHERE server_id = ? AND link_hash = ?',
+        serverId,
+        linkHash,
+      );
+      const data = parseJson(r?.discovery_json, discoverySchema);
+      return r && data ? { data, fetchedAt: r.fetched_at } : null;
+    },
+
+    async cacheContext(serverId: number, context: EntryContext, now: number) {
+      await db.runAsync(
+        `INSERT INTO cached_contexts (server_id, game_id, context_json, fetched_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(server_id, game_id) DO UPDATE SET
+           context_json = excluded.context_json, fetched_at = excluded.fetched_at`,
+        serverId,
+        context.game.game_id,
+        JSON.stringify(context),
+        now,
+      );
+    },
+
+    async cachedContext(
+      serverId: number,
+      gameId: number,
+    ): Promise<{ context: EntryContext; fetchedAt: number } | null> {
+      const r = await db.getFirstAsync<{ context_json: string; fetched_at: number }>(
+        'SELECT context_json, fetched_at FROM cached_contexts WHERE server_id = ? AND game_id = ?',
+        serverId,
+        gameId,
+      );
+      const context = parseJson(r?.context_json, entryContextSchema);
+      return r && context ? { context, fetchedAt: r.fetched_at } : null;
+    },
+
+    /** Called once a game is on the phone: from then on its own row is the source of truth. */
+    async dropCachedContext(serverId: number, gameId: number) {
+      await db.runAsync(
+        'DELETE FROM cached_contexts WHERE server_id = ? AND game_id = ?',
+        serverId,
+        gameId,
+      );
+    },
+
+    async purgeCache(now: number): Promise<void> {
+      const cutoff = now - CACHE_RETENTION_MS;
+      await db.runAsync('DELETE FROM cached_lists WHERE fetched_at < ?', cutoff);
+      await db.runAsync('DELETE FROM cached_contexts WHERE fetched_at < ?', cutoff);
     },
 
     /* Saved links --------------------------------------------------- */

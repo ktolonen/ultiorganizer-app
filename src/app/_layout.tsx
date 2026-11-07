@@ -42,6 +42,7 @@ export default function RootLayout() {
           await deleteLinkToken(g.serverId, g.gameId);
         }
         for (const id of await repo.purgeOldLinks(Date.now())) await deleteSavedLinkToken(id);
+        await repo.purgeCache(Date.now());
       } finally {
         if (live) setReady(true);
       }

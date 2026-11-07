@@ -6,6 +6,7 @@ import { newSession, startClock } from '../timekeeper/engine';
 import { BUNDLED_TEMPLATES } from '../timekeeper/templates';
 import { type Db, MIGRATIONS, migrate } from './migrations';
 import {
+  CACHE_RETENTION_MS,
   LINK_RETENTION_MS,
   RETENTION_MS,
   STANDALONE_SCOPE,
@@ -333,5 +334,41 @@ describe('caps in stored games', () => {
     expect((await repo.loadGame(s.id, 123))?.state.caps).toEqual({
       half_cap: { time: 1500, pointCap: 8 },
     });
+  });
+});
+
+describe('cached server data', () => {
+  const list = {
+    event_id: 'E1',
+    games: [],
+    available_from: '2026-06-01',
+  };
+  it('round-trips a game list by link hash and an entry context by game', async () => {
+    const { repo } = await fresh();
+    const s = await repo.upsertServer('https://a.org', 'A', NOW);
+    await repo.cacheList(s.id, 'hash1', list, NOW);
+    await repo.cacheList(s.id, 'hash1', { ...list, available_from: null }, NOW + 1);
+    expect(await repo.cachedList(s.id, 'hash1')).toEqual({
+      data: { ...list, available_from: null },
+      fetchedAt: NOW + 1,
+    });
+    expect(await repo.cachedList(s.id, 'other')).toBeNull();
+    await repo.cacheContext(s.id, entryContextFixture(), NOW);
+    expect((await repo.cachedContext(s.id, 123))?.context.token).toBe('tok0');
+    await repo.dropCachedContext(s.id, 123);
+    expect(await repo.cachedContext(s.id, 123)).toBeNull();
+  });
+  it('purges data older than the retention and goes with its server', async () => {
+    const { repo } = await fresh();
+    const s = await repo.upsertServer('https://a.org', 'A', NOW);
+    await repo.cacheList(s.id, 'old', list, NOW - CACHE_RETENTION_MS - 1);
+    await repo.cacheList(s.id, 'new', list, NOW);
+    await repo.cacheContext(s.id, entryContextFixture(), NOW - CACHE_RETENTION_MS - 1);
+    await repo.purgeCache(NOW);
+    expect(await repo.cachedList(s.id, 'old')).toBeNull();
+    expect(await repo.cachedList(s.id, 'new')).not.toBeNull();
+    expect(await repo.cachedContext(s.id, 123)).toBeNull();
+    await repo.removeServer(s.id);
+    expect(await repo.cachedList(s.id, 'new')).toBeNull();
   });
 });

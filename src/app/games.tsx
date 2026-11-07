@@ -24,6 +24,7 @@ export default function Games() {
   const { palette } = useTheme();
   const link = usePendingLink((s) => s.link);
   const [data, setData] = useState<Discovery | null>(null);
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState<number | null>(null);
@@ -37,8 +38,9 @@ export default function Games() {
       setLoading(false);
       if (res.ok) {
         setData(res.data);
+        setCachedAt(res.cachedAt ?? null);
         // Keep a field link on Home so its games reopen without another scan.
-        if (shouldRemember(res.data)) {
+        if (res.cachedAt === undefined && shouldRemember(res.data)) {
           getRepo()
             .then((repo) =>
               rememberLink({
@@ -79,7 +81,15 @@ export default function Games() {
     const res = await openFromLink(link, g.game_id);
     setOpening(null);
     if (!res.ok) {
-      return setError(t(res.error === 'network' ? 'games.error.network' : 'games.error.bad_body'));
+      return setError(
+        t(
+          res.error === 'network'
+            ? 'games.error.notSaved'
+            : res.error === 'forbidden'
+              ? 'games.error.forbidden'
+              : 'games.error.bad_body',
+        ),
+      );
     }
     router.push(`/game/${link.serverId}/${g.game_id}`);
   };
@@ -106,6 +116,19 @@ export default function Games() {
           {t('games.title')}
         </Txt>
         {days.length === 1 && <Txt muted>{days[0]}</Txt>}
+        {cachedAt !== null && (
+          <>
+            <Txt accessibilityRole="alert" style={{ color: palette.signalStop }}>
+              {t('games.offline', {
+                time: new Date(cachedAt).toLocaleTimeString(i18n.language, {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+              })}
+            </Txt>
+            <Button label={t('games.retry')} kind="secondary" onPress={retry} />
+          </>
+        )}
         {loading && <Txt muted>…</Txt>}
         {error && (
           <>

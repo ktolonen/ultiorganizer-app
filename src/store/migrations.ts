@@ -49,6 +49,22 @@ export const MIGRATIONS: readonly string[] = [
      day TEXT,
      used_at INTEGER NOT NULL
    );`,
+  // Server data saved while online, so games can be opened and kept without a connection
+  // and synced later. A list is keyed by a hash of its link token, never the token itself.
+  `CREATE TABLE cached_lists (
+     server_id INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+     link_hash TEXT NOT NULL,
+     discovery_json TEXT NOT NULL,
+     fetched_at INTEGER NOT NULL,
+     PRIMARY KEY (server_id, link_hash)
+   );
+   CREATE TABLE cached_contexts (
+     server_id INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+     game_id INTEGER NOT NULL,
+     context_json TEXT NOT NULL,
+     fetched_at INTEGER NOT NULL,
+     PRIMARY KEY (server_id, game_id)
+   );`,
 ];
 
 /** The minimal database surface the store needs; `expo-sqlite` and test fakes both fit. */

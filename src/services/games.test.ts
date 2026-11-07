@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { entryContextFixture } from '../game/fixtures';
 import { type Db, migrate } from '../store/migrations';
 import { createRepo } from '../store/repo';
-import { gameTitle, groupByField, openGame } from './games';
+import { gameTitle, groupByField, openGame, prefetchContexts } from './games';
 
 async function setup() {
   const raw = new DatabaseSync(':memory:');
@@ -142,5 +142,94 @@ describe('list helpers', () => {
   });
   it('titles a game by field and teams', () => {
     expect(gameTitle({ field: null, home: { name: null }, away: { name: 'V' } })).toBe('? – V');
+  });
+});
+
+describe('saved server data', () => {
+  const offline = () => jest.fn().mockRejectedValue(new Error('offline'));
+  const status = (code: string, s: number) =>
+    jest.fn().mockResolvedValue(new Response(`{"error":{"code":"${code}"}}`, { status: s }));
+  const open = (d: Awaited<ReturnType<typeof setup>>, fetch: unknown, gameId = 123) =>
+    openGame({
+      repo: d.repo,
+      creds,
+      serverId: d.server.id,
+      gameId,
+      saveLinkToken: d.saveLinkToken,
+      fetch: fetch as never,
+      now: 50,
+    });
+
+  it('opens a game from the saved entry context when the server cannot be reached', async () => {
+    const d = await setup();
+    await d.repo.cacheContext(d.server.id, entryContextFixture(), 10);
+    const r = await open(d, offline());
+    expect(r).toMatchObject({ ok: true, game: { resumed: false, cachedAt: 10 } });
+    // It is now an ordinary game on the phone with the saved token, and the cache row is gone.
+    expect((await d.repo.loadGame(d.server.id, 123))?.outbox.token).toBe('tok0');
+    expect(await d.repo.cachedContext(d.server.id, 123)).toBeNull();
+    expect(d.saved).toEqual([`123:${'l'.repeat(32)}`]);
+  });
+  it('does not fall back to saved data when the server refuses', async () => {
+    const d = await setup();
+    await d.repo.cacheContext(d.server.id, entryContextFixture(), 10);
+    expect(await open(d, status('game_not_covered', 403))).toEqual({
+      ok: false,
+      error: 'forbidden',
+    });
+    expect(await open(d, status('game_not_found', 404))).toEqual({
+      ok: false,
+      error: 'not_found',
+    });
+    expect(await d.repo.listGames()).toEqual([]);
+  });
+  it('prefers a fresh entry context and drops the saved one', async () => {
+    const d = await setup();
+    await d.repo.cacheContext(d.server.id, entryContextFixture({ token: 'old' }), 10);
+    const r = await open(d, ok());
+    expect(r).toMatchObject({ ok: true, game: { cachedAt: undefined } });
+    expect((await d.repo.loadGame(d.server.id, 123))?.outbox.token).toBe('tok0');
+    expect(await d.repo.cachedContext(d.server.id, 123)).toBeNull();
+  });
+
+  const ctxFor = (gameId: number) => ({
+    data: entryContextFixture({ game: { ...entryContextFixture().game, game_id: gameId } }),
+  });
+  const prefetch = (d: Awaited<ReturnType<typeof setup>>, fetch: jest.Mock, ids: number[]) =>
+    prefetchContexts({
+      repo: d.repo,
+      creds,
+      serverId: d.server.id,
+      gameIds: ids,
+      fetch: fetch as never,
+      now: () => 7,
+    });
+
+  it('saves the entry context of each listed game not yet on the phone', async () => {
+    const d = await setup();
+    await open(d, ok()); // game 123 is on the phone already
+    const fetch = jest.fn((url: string) => {
+      const id = Number(/games\/(\d+)/.exec(url)![1]);
+      return Promise.resolve(new Response(JSON.stringify(ctxFor(id))));
+    });
+    expect(await prefetch(d, fetch, [123, 5, 6])).toBe(2);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect((await d.repo.cachedContext(d.server.id, 5))?.fetchedAt).toBe(7);
+    expect(await d.repo.cachedContext(d.server.id, 123)).toBeNull();
+  });
+  it('skips a missing game but stops at a network failure or a refused link', async () => {
+    const d = await setup();
+    const answers = [
+      new Response('{"error":{"code":"game_not_found"}}', { status: 404 }),
+      new Response(JSON.stringify(ctxFor(2))),
+      new Response('{"error":{"code":"rate_limited"}}', { status: 429 }),
+      new Response(JSON.stringify(ctxFor(4))),
+    ];
+    const fetch = jest.fn(() => Promise.resolve(answers.shift()!));
+    expect(await prefetch(d, fetch, [1, 2, 3, 4])).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    const net = jest.fn().mockRejectedValue(new Error('offline'));
+    expect(await prefetch(d, net, [7, 8])).toBe(0);
+    expect(net).toHaveBeenCalledTimes(1);
   });
 });

@@ -152,5 +152,8 @@
   "game.capsLocal": "This server does not store caps yet, so they are kept on this phone only.",
   "error.times_hidden": "Caps are not recorded while the event hides times.",
   "error.point_cap_too_low": "A new point cap must be greater than the current score.",
-  "game.capEdit": "Change or remove"
+  "game.capEdit": "Change or remove",
+  "games.offline": "Offline. This is the game list saved at {{time}}; scores may have changed since. Entries are kept on this phone and sent when the connection returns.",
+  "games.error.notSaved": "The server could not be reached, and this game was not saved on this phone while it was online.",
+  "games.error.forbidden": "The server refused this game. The scorekeeping link may no longer cover it."
 }

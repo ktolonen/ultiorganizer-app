@@ -202,7 +202,7 @@ export function fetchEntryContext(
   );
 }
 
-const discovery = z.object({
+export const discoverySchema = z.object({
   event_id: z.string().nullable().optional(),
   games: z.array(
     z.object({
@@ -222,7 +222,7 @@ const discovery = z.object({
   ),
   available_from: z.string().nullable(),
 });
-export type Discovery = z.infer<typeof discovery>;
+export type Discovery = z.infer<typeof discoverySchema>;
 export type DiscoveredGame = Discovery['games'][number];
 
 export function fetchGames(
@@ -233,7 +233,7 @@ export function fetchGames(
     creds,
     '/scorekeeping/games',
     (json) => {
-      const parsed = discovery.safeParse(dataOf(json));
+      const parsed = discoverySchema.safeParse(dataOf(json));
       return parsed.success ? parsed.data : null;
     },
     deps,
