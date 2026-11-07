@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { entryContextFixture } from '../game/fixtures';
 import { fromEntryContext } from '../game/reducer';
+import { LOCAL_SERVER_ID, newLocalSession } from '../game/local';
 import { newOutbox } from '../sync/outbox';
 import { newSession, startClock } from '../timekeeper/engine';
 import { BUNDLED_TEMPLATES } from '../timekeeper/templates';
@@ -370,5 +371,49 @@ describe('cached server data', () => {
     expect(await repo.cachedContext(s.id, 123)).toBeNull();
     await repo.removeServer(s.id);
     expect(await repo.cachedList(s.id, 'new')).toBeNull();
+  });
+});
+
+describe('local games', () => {
+  it('keeps them under the reserved row, which is not listed as a server', async () => {
+    const { repo } = await fresh();
+    expect(await repo.listServers()).toEqual([]);
+    expect(await repo.nextGameId(LOCAL_SERVER_ID)).toBe(1);
+    const session = newLocalSession(
+      1,
+      'Lions – Tigers',
+      {
+        home: 'Lions',
+        away: 'Tigers',
+        field: '',
+        timeoutsPerTeam: 2,
+      },
+      NOW,
+    );
+    await repo.saveGame({ ...session, now: NOW });
+    const g = await repo.loadGame(LOCAL_SERVER_ID, 1);
+    expect(g?.context.home.name).toBe('Lions');
+    expect(g?.outbox.offlineOnly).toBe(true);
+    expect(await repo.nextGameId(LOCAL_SERVER_ID)).toBe(2);
+    expect((await repo.listGames()).map((x) => x.serverId)).toEqual([LOCAL_SERVER_ID]);
+    // A new server never takes the reserved id.
+    const s = await repo.upsertServer('https://a.org', 'A', NOW);
+    expect(s.id).toBeGreaterThan(0);
+  });
+  it('are never purged automatically, even finalized long ago', async () => {
+    const { repo } = await fresh();
+    let session = newLocalSession(
+      1,
+      't',
+      { home: 'A', away: 'B', field: '', timeoutsPerTeam: 2 },
+      NOW,
+    );
+    session = {
+      ...session,
+      state: { ...session.state, result: { home: 3, away: 1, state: 'final' } },
+    };
+    await repo.saveGame({ ...session, now: NOW });
+    expect(await repo.purgeOldGames(NOW + RETENTION_MS * 10)).toEqual([]);
+    expect(await repo.loadGame(LOCAL_SERVER_ID, 1)).not.toBeNull();
   });
 });

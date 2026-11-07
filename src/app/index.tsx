@@ -2,6 +2,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { isLocalGame } from '../game/local';
 import { formatDay, formatDayTime } from '../services/links';
 import { usePendingLink } from '../services/pending';
 import { deleteLinkToken, deleteSavedLinkToken, getSavedLinkToken } from '../store/secure';
@@ -115,6 +116,7 @@ export default function Home() {
           kind="secondary"
           onPress={() => router.push('/timekeeper')}
         />
+        <Button label={t('home.local')} kind="secondary" onPress={() => router.push('/local')} />
 
         {links.length > 0 && (
           <>
@@ -181,7 +183,11 @@ export default function Home() {
                   variant="small"
                   style={{ color: g.unsent > 0 ? palette.signalStop : palette.muted }}
                 >
-                  {g.unsent > 0 ? t('home.unsent', { count: g.unsent }) : t('home.synced')}
+                  {isLocalGame(g.serverId)
+                    ? t('home.localOnly')
+                    : g.unsent > 0
+                      ? t('home.unsent', { count: g.unsent })
+                      : t('home.synced')}
                 </Txt>
               </Txt>
             </Pressable>

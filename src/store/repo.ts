@@ -77,7 +77,10 @@ export function createRepo(db: Db) {
     /* Servers ------------------------------------------------------- */
 
     async listServers(): Promise<ServerRow[]> {
-      const rows = await db.getAllAsync<ServerSql>('SELECT * FROM servers ORDER BY created_at');
+      // Row 0 holds local games; it is not a server.
+      const rows = await db.getAllAsync<ServerSql>(
+        'SELECT * FROM servers WHERE id != 0 ORDER BY created_at',
+      );
       return rows.map(toServer);
     },
 
@@ -237,6 +240,15 @@ export function createRepo(db: Db) {
       });
     },
 
+    /** The next free game id under a server row; local games number themselves this way. */
+    async nextGameId(serverId: number): Promise<number> {
+      const r = await db.getFirstAsync<{ n: number | null }>(
+        'SELECT MAX(game_id) AS n FROM games WHERE server_id = ?',
+        serverId,
+      );
+      return (r?.n ?? 0) + 1;
+    },
+
     async deleteGame(serverId: number, gameId: number): Promise<void> {
       await db.runAsync('DELETE FROM games WHERE server_id = ? AND game_id = ?', serverId, gameId);
       await db.runAsync(
@@ -252,7 +264,8 @@ export function createRepo(db: Db) {
     async purgeOldGames(now: number): Promise<{ serverId: number; gameId: number }[]> {
       const cutoff = now - RETENTION_MS;
       const old = await db.getAllAsync<{ server_id: number; game_id: number }>(
-        'SELECT server_id, game_id FROM games WHERE finalized_at IS NOT NULL AND synced_at IS NOT NULL AND synced_at < ?',
+        // Local games (server 0) are the only copy of their result: only the user deletes them.
+        'SELECT server_id, game_id FROM games WHERE server_id != 0 AND finalized_at IS NOT NULL AND synced_at IS NOT NULL AND synced_at < ?',
         cutoff,
       );
       for (const g of old) await this.deleteGame(g.server_id, g.game_id);

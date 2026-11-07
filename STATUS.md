@@ -1,6 +1,6 @@
 # Status
 
-Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18), with caps added on 2026-11-07.
+Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18), with caps, saved server data and local games added on 2026-11-07.
 
 ## Verified here
 
@@ -15,6 +15,7 @@ Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18), wi
 | 3 Live scorekeeping | Entry-context parsing, reducer mirroring the API rules, rosters, live screen, goal sheet, timeouts, spirit stoppages, score taps, outbox with idempotent replay and backoff, sync dot, finalize                                                                                                                                                                             |
 | 4 Resilience        | Conflict sheet (keep server / upload mine), full-upload fallback and fall-behind offer, offline-only sessions, undo per the rules, crash recovery from the persisted outbox                                                                                                                                                                                                 |
 | 5 Caps (S2)         | "Record cap" from the timekeeper's cap notice and on the Sheet tab: time called (5-second steps) and new point cap, suggested one above the higher score; correct or remove a recorded cap. Rules mirrored in the reducer (`times_hidden`, `point_cap_too_low`, any point cap from 1 for a correction, allowed on a final game). Synced through `PUT`/`DELETE caps/{type}`. |
+| Offline             | Loading a link's game list online saves the list and each game's entry context, so the games open later without a connection and sync when it returns. Local games for games the server does not know: typed team names, kept on this phone only.                                                                                                                           |
 
 ## Differences from the plan
 
@@ -28,16 +29,17 @@ Against [PLAN.md](PLAN.md), as of the first implementation pass (2026-10-18), wi
 - A 2xx answer that is not a write answer (captive portal) is retried with the same key, never marked sent.
 - Server signal texts are database translations (`uo_translation`), not in the `.po` files, the app sends `Accept-Language` to the S1 templates route, so fi/de/es signal texts come from the server when it is new enough, and fall back to bundled English otherwise.
 - **Caps sit outside the token and the full upload.** A full upload keeps the server's caps, so unsent cap rows stay queued ahead of an upload instead of being folded into it; a refused cap row is dropped when the whole game is uploaded. A server without the caps route answers `404 not_found` (or `405`): that cap row is settled as skipped, the outbox remembers `capsAbsent`, later caps of that game stay on the phone, and the Sheet tab says so.
+- **Saved server data.** After a link's game list loads, the list (keyed by a SHA-256 of server id and link token, since SQLite never holds tokens) and the entry context of each game not yet on the phone are saved in the background, one request at a time, stopping at a network failure, a rate limit or a refused link. Opening a game falls back to its saved context **only on a network failure**: a 401/403/404 still shows an error. A game opened that way is an ordinary game with the saved token; its entries queue as during any outage, and a server that moved on meanwhile surfaces through the usual conflict sheet. Offline, the Games screen shows the saved list and when it was saved. Saved data is dropped a week after it was fetched, when its game is opened, or with its server. A single-game link is still not kept on Home, so after the app is closed offline, only a rescanned QR or a saved field link reaches a saved list.
+- **Local games** belong to a reserved server row (id 0, root `local:`, left out of server lists). Their entry context is built on the phone with no players, so they keep the result with +1 and −1, timeouts, spirit stoppages, caps and the clock; the user picks timeouts per team. The outbox is offline-only and nothing is ever queued or uploaded; the screen shows "This phone only" instead of the sync status and offers no upload. They are never purged automatically, since the phone has the only copy; the user deletes them from Home. Linking one to a server game later is deliberately not built.
+- Goal and timeout times keep the exact second (decided 2026-11-07), although the web Scorekeeper rounds to 5 seconds.
 - Day `signal-warn` (`#E8A200`) is 2.2:1 on white. It is used only as a fill with text on it (9.6:1), never as a line or icon; a test records this.
 
 ## Not done
 
 - **Server work S0–S2** is done in `../ultiorganizer` (setup QR, `GET timekeeper/templates`, caps writes). `api/openapi.json` and the generated types are synced to it. The app still works against servers without them: paste-token pairing, a 404 on templates falls back to bundled defaults (probed once, cached), and caps stay on the phone.
 - **EAS**: the project is linked, development and preview profiles build APKs, iOS declares exempt encryption, and `expo-updates` is in for OTA updates. **Maestro flows, store assets and submission, a beta at a real tournament** still need devices, accounts and an event.
-- A way to start a game offline-only. Needs a design decision first: without a server there is no entry context (teams, rules, game id), so it would be a device-local game with typed team names that can never be uploaded. The existing `offlineOnly` outbox flag covers only a real game that falls behind.
 - Landscape layout, screenshots in Light/Dark × phone/tablet × en/fi/de, an accessibility pass with VoiceOver/TalkBack, reviewed translations, Sentry (opt-in).
 - Contract tests against the dev stack (`docs/dev/compose.yaml`).
-- Goal and timeout times use the game clock rounded to the second. The web Scorekeeper (`script/scorekeeper.js` `roundedTime()`) floors to the second and then rounds to the nearest 5 seconds, with a carry into the minute, because its form only offers 5-second steps. The API takes any second, so the app keeps the exact time; whether to match the 5-second steps is a product decision, not yet made.
 
 ## Process note
 

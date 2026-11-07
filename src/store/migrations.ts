@@ -65,6 +65,9 @@ export const MIGRATIONS: readonly string[] = [
      fetched_at INTEGER NOT NULL,
      PRIMARY KEY (server_id, game_id)
    );`,
+  // The reserved row local games belong to (LOCAL_SERVER_ID in src/game/local.ts). Its root
+  // is not a URL, so no pairing or scan can match it; server lists leave it out.
+  `INSERT INTO servers (id, root, label, created_at) VALUES (0, 'local:', 'This phone', 0);`,
 ];
 
 /** The minimal database surface the store needs; `expo-sqlite` and test fakes both fit. */

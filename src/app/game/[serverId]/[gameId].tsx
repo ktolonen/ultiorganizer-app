@@ -23,6 +23,7 @@ import {
   TeamPicker,
 } from '../../../game/ui';
 import { useGame, type ActionError } from '../../../game/useGame';
+import { isLocalGame } from '../../../game/local';
 import { AUTO_POINT_KEY, gameScope, parseAutoPoint, SCOREKEEPER_KEY } from '../../../store/repo';
 import { getRepo } from '../../../store/sqlite';
 import { isFullySynced, unsentRows } from '../../../sync/outbox';
@@ -46,7 +47,11 @@ export default function GameScreen() {
   const router = useRouter();
   const { palette } = useTheme();
   const game = useGame(serverId, gameId);
-  const tk = useTimekeeper(useTemplates(serverId), gameScope(serverId, gameId));
+  const tk = useTimekeeper(
+    // A local game has no server of its own: use whichever server templates are cached.
+    useTemplates(isLocalGame(serverId) ? undefined : serverId),
+    gameScope(serverId, gameId),
+  );
   const [tab, setTab] = useState<Tab>('live');
   const [goalSide, setGoalSide] = useState<Side | null>(null);
   const [asking, setAsking] = useState<Asking>(null);
@@ -84,6 +89,8 @@ export default function GameScreen() {
   const clockSeconds = Math.round(tk.clockSeconds);
   const hideTimes = state.rules.hide_time_on_scoresheet;
   const isFinal = state.result?.state === 'final';
+  // Kept on this phone only: nothing syncs, and there are no players to put on rosters.
+  const local = isLocalGame(serverId);
 
   const report = (err: ActionError | null): boolean => {
     setMessage(
@@ -203,10 +210,19 @@ export default function GameScreen() {
         <Txt variant="small" accessibilityRole="header" numberOfLines={1} style={{ flex: 1 }}>
           {game.session.title}
         </Txt>
-        <SyncDot status={game.status} />
+        {local ? (
+          <Txt variant="small" muted>
+            {t('home.localOnly')}
+          </Txt>
+        ) : (
+          <SyncDot status={game.status} />
+        )}
       </View>
       <View style={[layout.row, styles.tabs]}>
-        {(['live', 'sheet', 'rosters', 'finish'] as const).map((id) => (
+        {(local
+          ? (['live', 'sheet', 'finish'] as const)
+          : (['live', 'sheet', 'rosters', 'finish'] as const)
+        ).map((id) => (
           <View key={id} style={{ flex: 1 }}>
             <Button
               label={t(`game.tab.${id}`)}
@@ -225,7 +241,7 @@ export default function GameScreen() {
           {message}
         </Txt>
       )}
-      {game.offerUpload && (
+      {game.offerUpload && !local && (
         <View style={{ paddingHorizontal: SPACE.lg }}>
           <Button
             label={t('game.uploadAll')}
@@ -261,7 +277,7 @@ export default function GameScreen() {
               />
             ))}
           </View>
-          {bothRostersEmpty && (
+          {bothRostersEmpty && !local && (
             <Txt variant="small" muted style={{ paddingHorizontal: SPACE.lg }}>
               {t('game.noRoster')}
             </Txt>
@@ -400,8 +416,8 @@ export default function GameScreen() {
           <Txt variant="title">
             {names.home} {score.home} – {score.away} {names.away}
           </Txt>
-          <SyncDot status={game.status} />
-          {isFinal && !synced && <Txt>{t('game.notSynced')}</Txt>}
+          {local ? <Txt muted>{t('game.localNote')}</Txt> : <SyncDot status={game.status} />}
+          {isFinal && !synced && !local && <Txt>{t('game.notSynced')}</Txt>}
           <Button
             label={t('game.finalize')}
             disabled={isFinal || state.result === null}
