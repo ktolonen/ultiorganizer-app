@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { entryContextFixture } from '../game/fixtures';
 import { type Db, migrate } from '../store/migrations';
 import { createRepo } from '../store/repo';
-import { gameTitle, groupByField, openGame, prefetchContexts } from './games';
+import { gameTitle, groupByField, openGame, PREFETCH_FRESH_MS, prefetchContexts } from './games';
 
 async function setup() {
   const raw = new DatabaseSync(':memory:');
@@ -170,6 +170,19 @@ describe('saved server data', () => {
     expect(await d.repo.cachedContext(d.server.id, 123)).toBeNull();
     expect(d.saved).toEqual([`123:${'l'.repeat(32)}`]);
   });
+  it('uses saved data when the server is unavailable rather than refusing', async () => {
+    for (const res of [
+      new Response('{"error":{"code":"maintenance"}}', { status: 503 }),
+      new Response('<html>Bad gateway</html>', { status: 502 }),
+      new Response('<html>Wi-Fi login</html>', { status: 200 }),
+      new Response('{"error":{"code":"rate_limited"}}', { status: 429 }),
+    ]) {
+      const d = await setup();
+      await d.repo.cacheContext(d.server.id, entryContextFixture(), 10);
+      const r = await open(d, jest.fn().mockResolvedValue(res));
+      expect(r).toMatchObject({ ok: true, game: { cachedAt: 10 } });
+    }
+  });
   it('does not fall back to saved data when the server refuses', async () => {
     const d = await setup();
     await d.repo.cacheContext(d.server.id, entryContextFixture(), 10);
@@ -195,14 +208,23 @@ describe('saved server data', () => {
   const ctxFor = (gameId: number) => ({
     data: entryContextFixture({ game: { ...entryContextFixture().game, game_id: gameId } }),
   });
-  const prefetch = (d: Awaited<ReturnType<typeof setup>>, fetch: jest.Mock, ids: number[]) =>
+  const prefetch = (
+    d: Awaited<ReturnType<typeof setup>>,
+    fetch: jest.Mock,
+    ids: number[],
+    now = 7,
+    final: number[] = [],
+  ) =>
     prefetchContexts({
       repo: d.repo,
       creds,
       serverId: d.server.id,
-      gameIds: ids,
+      games: ids.map((id) => ({
+        game_id: id,
+        result: { state: final.includes(id) ? 'final' : 'ongoing' },
+      })),
       fetch: fetch as never,
-      now: () => 7,
+      now: () => now,
     });
 
   it('saves the entry context of each listed game not yet on the phone', async () => {
@@ -216,6 +238,17 @@ describe('saved server data', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     expect((await d.repo.cachedContext(d.server.id, 5))?.fetchedAt).toBe(7);
     expect(await d.repo.cachedContext(d.server.id, 123)).toBeNull();
+  });
+  it('skips final games and games saved in the last few minutes', async () => {
+    const d = await setup();
+    const fetch = jest.fn((url: string) => {
+      const id = Number(/games\/(\d+)/.exec(url)![1]);
+      return Promise.resolve(new Response(JSON.stringify(ctxFor(id))));
+    });
+    expect(await prefetch(d, fetch, [1, 2], 1000, [2])).toBe(1);
+    expect(await prefetch(d, fetch, [1], 1000 + PREFETCH_FRESH_MS - 1)).toBe(0);
+    expect(await prefetch(d, fetch, [1], 1000 + PREFETCH_FRESH_MS)).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
   it('skips a missing game but stops at a network failure or a refused link', async () => {
     const d = await setup();

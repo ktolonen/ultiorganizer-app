@@ -146,6 +146,18 @@ export type ReadResult<T> =
   | { ok: false; kind: 'http'; status: number; code: string }
   | { ok: false; kind: 'bad_body' };
 
+/**
+ * The server could not answer properly, as opposed to refusing: no connection, a
+ * timeout, a rate limit, a 5xx from the server or its proxy, or a body that is not
+ * the server's (a captive portal). Saved data may stand in for these, never for a
+ * refusal such as 401, 403 or 404.
+ */
+export function serverUnavailable(res: ReadResult<unknown>): boolean {
+  if (res.ok) return false;
+  if (res.kind === 'network' || res.kind === 'bad_body') return true;
+  return res.status === 408 || res.status === 429 || res.status >= 500;
+}
+
 async function read<T>(
   creds: Credentials,
   path: string,

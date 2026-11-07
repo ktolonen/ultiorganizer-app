@@ -1,5 +1,5 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
-import { fetchGames, type Credentials, type Discovery } from '../api/http';
+import { fetchGames, serverUnavailable, type Credentials, type Discovery } from '../api/http';
 import { getAppToken, getLinkToken, saveLinkToken } from '../store/secure';
 import { getRepo } from '../store/sqlite';
 import { openGame, prefetchContexts, type OpenGameError } from './games';
@@ -35,7 +35,7 @@ const linkHash = (link: Link) =>
 /**
  * Loads a link's game list. Online, the list and the entry context of each game are
  * saved in the background, so the games can be opened and kept later without a
- * connection. Offline, the saved list is returned instead.
+ * connection. When the server cannot answer, the saved list is returned instead.
  */
 export async function loadGameList(link: Link): Promise<GameListResult> {
   const creds = await credentialsFor(link.serverId, link.linkToken);
@@ -50,13 +50,13 @@ export async function loadGameList(link: Link): Promise<GameListResult> {
         repo,
         creds,
         serverId: link.serverId,
-        gameIds: data.games.map((g) => g.game_id),
+        games: data.games,
         now: Date.now,
       });
     })().catch(() => undefined);
     return { ok: true, data };
   }
-  if (res.kind === 'network') {
+  if (serverUnavailable(res)) {
     const cached = await repo.cachedList(link.serverId, await linkHash(link));
     if (cached) return { ok: true, data: cached.data, cachedAt: cached.fetchedAt };
   }

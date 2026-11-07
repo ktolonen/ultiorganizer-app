@@ -1,5 +1,6 @@
 import {
   fetchEntryContext,
+  serverUnavailable,
   type Credentials,
   type DiscoveredGame,
   type FetchLike,
@@ -32,10 +33,11 @@ export const gameTitle = (game: {
 /**
  * Opens a game for keeping score. A game already on the phone is resumed untouched,
  * because during play the phone is the source of truth; otherwise the entry context
- * is fetched and a fresh session starts from it. Without a connection, an entry context
- * saved earlier (`prefetchContexts`) starts the session instead: entries queue as during
- * any network outage and sync when it returns. Only a network failure falls back to it;
- * a refusal (revoked link, removed game) must not be papered over with old data.
+ * is fetched and a fresh session starts from it. When the server cannot answer (no
+ * connection, a 5xx or rate limit, a captive portal), an entry context saved earlier
+ * (`prefetchContexts`) starts the session instead: entries queue as during any outage
+ * and sync when it returns. A refusal (revoked link, removed game) never falls back:
+ * it must not be papered over with old data.
  */
 export async function openGame(deps: {
   repo: Repo;
@@ -71,18 +73,20 @@ export async function openGame(deps: {
   let context: EntryContext;
   if (res.ok) {
     context = res.data;
-  } else if (res.kind === 'network') {
-    const cached = await repo.cachedContext(serverId, gameId);
-    if (!cached) return { ok: false, error: 'network' };
-    context = cached.context;
-    cachedAt = cached.fetchedAt;
   } else {
-    if (res.kind === 'bad_body') return { ok: false, error: 'bad_body' };
-    if (res.status === 404) return { ok: false, error: 'not_found' };
-    return {
-      ok: false,
-      error: res.status === 401 || res.status === 403 ? 'forbidden' : 'unexpected',
-    };
+    const cached = serverUnavailable(res) ? await repo.cachedContext(serverId, gameId) : null;
+    if (cached) {
+      context = cached.context;
+      cachedAt = cached.fetchedAt;
+    } else if (res.kind === 'network') return { ok: false, error: 'network' };
+    else if (res.kind === 'bad_body') return { ok: false, error: 'bad_body' };
+    else if (res.status === 404) return { ok: false, error: 'not_found' };
+    else {
+      return {
+        ok: false,
+        error: res.status === 401 || res.status === 403 ? 'forbidden' : 'unexpected',
+      };
+    }
   }
   const title = gameTitle({
     field: context.game.field,
@@ -104,25 +108,34 @@ export async function openGame(deps: {
   return { ok: true, game: { session, colors, resumed: false, cachedAt } };
 }
 
+/** A saved entry context younger than this is not fetched again. */
+export const PREFETCH_FRESH_MS = 10 * 60 * 1000;
+
 /**
  * Saves the entry context of each listed game not yet on the phone, one request at a
- * time, so the games can be opened later without a connection. Stops at the first
- * network failure, rate limit or refusal of the link; a single missing game is skipped.
- * Returns how many were saved.
+ * time, so the games can be opened later without a connection. Final games and games
+ * saved in the last few minutes are skipped: the API allows 120 requests a minute per
+ * app token and address, which phones behind one venue network share with their live
+ * writes. Stops at the first network failure, rate limit or refusal of the link; a
+ * single missing game is skipped. Returns how many were saved.
  */
 export async function prefetchContexts(deps: {
   repo: Repo;
   creds: Credentials;
   serverId: number;
-  gameIds: readonly number[];
+  games: readonly { game_id: number; result: { state: string } }[];
   fetch?: FetchLike;
   now: () => number;
   shouldStop?: () => boolean;
 }): Promise<number> {
   let saved = 0;
-  for (const gameId of deps.gameIds) {
+  for (const g of deps.games) {
     if (deps.shouldStop?.()) break;
+    const gameId = g.game_id;
+    if (g.result.state === 'final') continue;
     if (await deps.repo.hasGame(deps.serverId, gameId)) continue;
+    const recent = await deps.repo.cachedContext(deps.serverId, gameId);
+    if (recent && deps.now() - recent.fetchedAt < PREFETCH_FRESH_MS) continue;
     const res = await fetchEntryContext(deps.creds, gameId, { fetch: deps.fetch });
     if (res.ok) {
       await deps.repo.cacheContext(deps.serverId, res.data, deps.now());
