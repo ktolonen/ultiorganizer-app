@@ -1,4 +1,7 @@
 import {
+  adoptClock,
+  clockChange,
+  clockUntouched,
   addMark,
   applyFired,
   buildScenario,
@@ -277,5 +280,29 @@ describe('local template overrides', () => {
     const id = WFDF_TEMPLATE.signals.discretrieval[0].id;
     const r = resolveTemplate(WFDF_TEMPLATE, { signals: { [id]: -5 } });
     expect(r.signals.discretrieval[0].time).toBe(0);
+  });
+});
+
+describe('server clock', () => {
+  it('names each change as the server does', () => {
+    const idle = { running: false, startMs: 0, accumMs: 0 };
+    const run = { running: true, startMs: 5, accumMs: 0 };
+    const paused = { running: false, startMs: 0, accumMs: 3000 };
+    expect(clockChange(idle, run)).toBe('start');
+    expect(clockChange(run, paused)).toBe('pause');
+    expect(clockChange(paused, { ...run, accumMs: 3000 })).toBe('resume');
+    expect(clockChange(paused, idle)).toBe('reset');
+    expect(clockChange(run, idle)).toBe('reset');
+    expect(clockChange(paused, paused)).toBeNull();
+  });
+  it('takes over a running or paused clock', () => {
+    const caps = { half_time_cap: 3000, time_cap: 6000 };
+    const r = adoptClock(newSession(), { running: true, elapsedSec: 90 }, 100_000, caps);
+    expect(clockElapsed(r.clock, 100_000)).toBe(90);
+    expect(r.capConfig).toEqual(caps);
+    const p = adoptClock(newSession(), { running: false, elapsedSec: 90 }, 100_000, caps);
+    expect(p.clock).toEqual({ running: false, startMs: 0, accumMs: 90_000 });
+    expect(clockUntouched(newSession())).toBe(true);
+    expect(clockUntouched(p)).toBe(false);
   });
 });

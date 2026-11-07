@@ -33,6 +33,7 @@ const row = z.object({
     'delete_timeout',
     'delete_spirit_stoppage',
     'note',
+    'clock',
     'upload',
   ]),
   event: z
@@ -50,6 +51,7 @@ const row = z.object({
   createdAt: z.number(),
   serverNum: z.number().int().optional(),
   localNum: z.number().int().optional(),
+  followKey: z.string().optional(),
   skipped: z.boolean().optional(),
   error: z
     .object({
@@ -79,6 +81,7 @@ export const outboxSchema: z.ZodType<OutboxState> = z.object({
   capsAbsent: z.boolean().optional(),
   correctionsAbsent: z.boolean().optional(),
   noteRefused: z.enum(['absent', 'user_token_required']).optional(),
+  clockAbsent: z.boolean().optional(),
 }) as unknown as z.ZodType<OutboxState>;
 
 const timer = z.object({

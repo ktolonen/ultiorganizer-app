@@ -61,6 +61,19 @@ export function applyEvent(session: GameSession, event: GameEvent, deps: Deps): 
     return removeStoppage(session, event, state, deps);
   }
   if (event.type === 'correct_goal') return correctGoal(session, event, state, deps);
+  if (event.type === 'clock') {
+    // A server without the clock route keeps the clock on the phone only.
+    if (session.outbox.clockAbsent) return { ok: true, session: { ...session, state } };
+    let outbox = enqueue(session.outbox, event, state.teamIds, deps.newKey(), deps.now);
+    if (event.action === 'pause') {
+      const followKey = deps.newKey();
+      outbox = {
+        ...outbox,
+        rows: outbox.rows.map((r, i, all) => (i === all.length - 1 ? { ...r, followKey } : r)),
+      };
+    }
+    return { ok: true, session: { ...session, state, outbox } };
+  }
   // A server that refused notes keeps them on the phone only.
   if (event.type === 'note' && session.outbox.noteRefused) {
     return { ok: true, session: { ...session, state } };

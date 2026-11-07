@@ -316,3 +316,14 @@ describe('note', () => {
     expect(t.outbox.rows).toEqual([]);
   });
 });
+
+describe('clock', () => {
+  it('a pause carries the key of a possible follow-up set; nothing is queued without the route', () => {
+    const s = must(applyEvent(session(), { type: 'clock', action: 'pause', elapsed: 60 }, deps()));
+    expect(s.outbox.rows[0]).toMatchObject({ op: 'clock', key: 'k1', followKey: 'k2' });
+    const absent = { ...session(), outbox: { ...session().outbox, clockAbsent: true } };
+    const t = must(applyEvent(absent, { type: 'clock', action: 'start', elapsed: 0 }, deps()));
+    expect(t.state.result).toEqual({ home: 0, away: 0, state: 'ongoing' });
+    expect(t.outbox.rows).toEqual([]);
+  });
+});

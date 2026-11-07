@@ -39,6 +39,10 @@ export type GameHandle = {
   /** The server's version, fetched after a conflict, for the "someone else changed this game" sheet. */
   conflict: { fresh: EntryContext } | null;
   offerUpload: boolean;
+  /** A running or paused clock the server reported when the game opened, for the timekeeper to take over. */
+  serverClock: { running: boolean; elapsedSec: number; atMs: number } | null;
+  /** Carries a game clock change to the server; a change the rules refuse is just not sent. */
+  syncClock: (action: 'start' | 'resume' | 'pause' | 'reset', elapsedSec: number) => void;
   /** Applies a user action; returns the refusal, or null when it was accepted. */
   apply: (event: GameEvent) => ActionError | null;
   undoGoal: () => ActionError | null;
@@ -61,6 +65,7 @@ export function useGame(serverId: number, gameId: number): GameHandle {
   const [session, setSession] = useState<GameSession | null>(null);
   const [colors, setColorsState] = useState(() => defaultTeamColors(gameId));
   const [conflict, setConflict] = useState<{ fresh: EntryContext } | null>(null);
+  const [serverClock, setServerClock] = useState<GameHandle['serverClock']>(null);
   const ref = useRef<GameSession | null>(null);
   const colorsRef = useRef(colors);
   const creds = useRef<Credentials | null>(null);
@@ -133,6 +138,14 @@ export function useGame(serverId: number, gameId: number): GameHandle {
         const r = await fetchEntryContext(creds.current, gameId);
         const cur = ref.current;
         if (r.ok && alive.current && cur) {
+          const c = r.data.clock;
+          if (c && (c.state === 'running' || c.state === 'paused')) {
+            setServerClock({
+              running: c.state === 'running',
+              elapsedSec: c.elapsed,
+              atMs: Date.now(),
+            });
+          }
           const next = refreshEligible(cur, r.data);
           if (next !== cur) await commit(next);
         }
@@ -197,6 +210,9 @@ export function useGame(serverId: number, gameId: number): GameHandle {
     status: session ? syncStatus(session.outbox) : { kind: 'synced' },
     conflict,
     offerUpload: session ? shouldOfferUpload(session.outbox) : false,
+    serverClock,
+    syncClock: (action, elapsed) =>
+      void run((s) => applyEvent(s, { type: 'clock', action, elapsed }, deps())),
     apply: (event) => run((s) => applyEvent(s, event, deps())),
     undoGoal: () => run((s) => undoLastGoal(s, deps())),
     uploadWholeGame: () => run((s) => uploadAll(s, deps())),

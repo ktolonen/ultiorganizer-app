@@ -23,6 +23,9 @@ import {
   timerElapsed,
   timerView,
   addMark,
+  adoptClock,
+  clockChange,
+  clockUntouched,
   type CapStatus,
   type TimerView,
   type TimekeeperSession,
@@ -80,6 +83,13 @@ export type TimekeeperApi = {
 export function useTimekeeper(
   templates: TemplateSet = BUNDLED_TEMPLATES,
   scope: string = STANDALONE_SCOPE,
+  /** Called on each start, resume, pause or reset of the game clock, with its reading. */
+  onClockChange?: (action: 'start' | 'resume' | 'pause' | 'reset', elapsedSec: number) => void,
+  /**
+   * A running or paused clock read from the server at `atMs`, taken over only while this
+   * clock has never run. Taking it over is not reported: the server already has it.
+   */
+  serverClock?: { running: boolean; elapsedSec: number; atMs: number } | null,
 ): TimekeeperApi {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<TimekeeperSession>(newSession());
@@ -89,6 +99,10 @@ export function useTimekeeper(
   const [soundOn, setSoundOn] = useState(true);
   const sessionRef = useRef(session);
   const lastElapsed = useRef(-1);
+  const onClockRef = useRef(onClockChange);
+  useEffect(() => {
+    onClockRef.current = onClockChange;
+  }, [onClockChange]);
 
   const template = useMemo(
     () =>
@@ -104,8 +118,10 @@ export function useTimekeeper(
   const resolved = useMemo(() => resolveTemplate(template, overrides), [template, overrides]);
 
   const persist = useCallback(
-    async (s: TimekeeperSession, tid = templateId, o = overridesAll) => {
+    async (s: TimekeeperSession, tid = templateId, o = overridesAll, notify = true) => {
+      const change = notify ? clockChange(sessionRef.current.clock, s.clock) : null;
       sessionRef.current = s;
+      if (change) onClockRef.current?.(change, Math.floor(clockElapsed(s.clock, Date.now())));
       setSession(s);
       await (await getRepo()).saveTimekeeper(scope, s, tid, o);
     },
@@ -134,6 +150,21 @@ export function useTimekeeper(
       live = false;
     };
   }, [scope]);
+
+  const adopted = useRef<object | null>(null);
+  useEffect(() => {
+    if (!ready || !serverClock || adopted.current === serverClock) return;
+    adopted.current = serverClock;
+    const s = sessionRef.current;
+    if (!clockUntouched(s)) return;
+    setNowMs(Date.now());
+    void persist(
+      adoptClock(s, serverClock, serverClock.atMs, resolved.caps),
+      templateId,
+      overridesAll,
+      false,
+    );
+  }, [ready, serverClock, persist, resolved.caps, templateId, overridesAll]);
 
   const running = !!session.timer || session.clock.running;
 
@@ -238,6 +269,7 @@ export function useTimekeeper(
     resetClock: () => act((s) => resetClock(s)),
     mark: () => act((s, now) => addMark(s, 'mark', i18n.t('timekeeper.mark'), now)),
     dismissCap: (kind) => act((s) => dismissCap(s, kind)),
+
     selectTemplate: (id) => {
       setTemplateId(id);
       void persist(sessionRef.current, id);

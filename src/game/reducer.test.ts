@@ -482,3 +482,29 @@ describe('note', () => {
     expect(base().note).toBeNull();
   });
 });
+
+describe('clock', () => {
+  const clock = (
+    action: 'start' | 'pause' | 'resume' | 'set' | 'reset',
+    elapsed = 0,
+  ): GameEvent => ({
+    type: 'clock',
+    action,
+    elapsed,
+  });
+  it('start makes the game ongoing; reset at 0-0 returns it to not started', () => {
+    const s = must(base(), clock('start'));
+    expect(s.result).toEqual({ home: 0, away: 0, state: 'ongoing' });
+    expect(must(s, clock('reset')).result).toBeNull();
+  });
+  it('refuses a reset at another score, a final game and hidden times', () => {
+    const one = must(base(), goal('home', 1, 2, 5));
+    expect(code(one, clock('reset'))).toBe('score_not_zero');
+    expect(code(must(one, { type: 'finalize' }), clock('pause'))).toBe('game_final');
+    expect(code(rulesWith({ hide_time_on_scoresheet: true }), clock('start'))).toBe('times_hidden');
+  });
+  it('set needs a reading the server can store', () => {
+    expect(code(base(), clock('set', 40000))).toBe('validation_failed:elapsed');
+    expect(code(base(), clock('set', 600))).toBe('ok');
+  });
+});

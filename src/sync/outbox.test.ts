@@ -531,3 +531,60 @@ describe('note', () => {
     expect(s.rows.map((r) => r.op)).toEqual(['note', 'upload']);
   });
 });
+
+describe('clock', () => {
+  const clock = (action: 'start' | 'pause' | 'resume' | 'reset', elapsed = 0): GameEvent => ({
+    type: 'clock',
+    action,
+    elapsed,
+  });
+  const pause = (s: OutboxState, elapsed: number) => {
+    const t = add(s, clock('pause', elapsed));
+    return {
+      ...t,
+      rows: t.rows.map((r, i) => (i === t.rows.length - 1 ? { ...r, followKey: 'follow' } : r)),
+    };
+  };
+  it('sends elapsed only with set', () => {
+    expect(nextToSend(add(fresh(), clock('start', 0)), 0)?.body).toEqual({ action: 'start' });
+  });
+  it('a refusal settles the row: the phone keeps its own clock', () => {
+    const s = step(add(add(fresh(), clock('resume', 9)), goalEv(10)), {
+      kind: 'http',
+      status: 409,
+      code: 'clock_not_paused',
+    }).state;
+    expect(s.paused).toBeNull();
+    expect(s.rows[0]).toMatchObject({ status: 'sent', skipped: true });
+    expect(s.clockAbsent).toBeUndefined();
+  });
+  it('a server without the route is remembered', () => {
+    const s = step(add(fresh(), clock('start')), {
+      kind: 'http',
+      status: 404,
+      code: 'not_found',
+    }).state;
+    expect(s.clockAbsent).toBe(true);
+  });
+  it("sets the phone's reading right after a pause when the server's differs", () => {
+    let s = add(pause(fresh(), 300), clock('resume', 300));
+    s = step(s, ok('t1', { clock: { state: 'paused', elapsed: 240 } })).state;
+    expect(s.rows.map((r) => [r.op, r.key, r.body])).toEqual([
+      ['clock', 'key-1', { action: 'pause' }],
+      ['clock', 'follow', { action: 'set', elapsed: 300 }],
+      ['clock', 'key-2', { action: 'resume' }],
+    ]);
+    expect(nextToSend(s, 0)?.key).toBe('follow');
+  });
+  it('leaves a close reading alone', () => {
+    const s = step(
+      pause(fresh(), 300),
+      ok('t1', { clock: { state: 'paused', elapsed: 302 } }),
+    ).state;
+    expect(s.rows).toHaveLength(1);
+  });
+  it('a full upload keeps unsent clock rows ahead of it', () => {
+    const s = enqueueUpload(add(fresh(), clock('start')), doc, key(), 0)!;
+    expect(s.rows.map((r) => r.op)).toEqual(['clock', 'upload']);
+  });
+});

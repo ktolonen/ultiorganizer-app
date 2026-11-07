@@ -95,7 +95,15 @@ export type GameEvent =
   | { type: 'cap'; cap: CapType; time: number; pointCap: number }
   | { type: 'remove_cap'; cap: CapType }
   /** Sets the game note; an empty text clears it. */
-  | { type: 'note'; text: string };
+  | { type: 'note'; text: string }
+  /**
+   * A change of the game clock, as the Scorekeeper clock controls make it. The clock itself
+   * runs in the timekeeper; this carries the change to the server. `elapsed` is the phone's
+   * reading in whole seconds (the value sent for `set`).
+   */
+  | { type: 'clock'; action: ClockAction; elapsed: number };
+
+export type ClockAction = 'start' | 'pause' | 'resume' | 'set' | 'reset';
 
 export type GameErrorCode =
   | 'forfeit'
@@ -110,6 +118,7 @@ export type GameErrorCode =
   | 'times_hidden'
   | 'point_cap_too_low'
   | 'note_too_long'
+  | 'score_not_zero'
   | 'validation_failed';
 
 export type GameError = { code: GameErrorCode; path?: string; message: string };
@@ -298,6 +307,30 @@ function reduceDeleteLast(
   const totals = goalTotals(goals);
   const result: GameResult | null = tracking ? { ...state.result!, ...totals } : state.result;
   return ok({ ...state, goals, result });
+}
+
+// Like the server's POST clock: refused on a final game and while times are hidden, when
+// the server keeps no clock. Start makes the game ongoing; reset needs 0-0 and returns the
+// game to not started. Whether the clock is running is the timekeeper's business.
+function reduceClock(state: GameState, e: Extract<GameEvent, { type: 'clock' }>): Reduced {
+  if (state.result?.state === 'final') return fail('game_final', 'The game is final.');
+  if (state.rules.hide_time_on_scoresheet) {
+    return fail('times_hidden', 'The game clock is not kept while the event hides times.');
+  }
+  if (e.action === 'set' && (!isInt(e.elapsed) || e.elapsed < 0 || e.elapsed > MAX_GOAL_TIME)) {
+    return fail('validation_failed', 'A clock reading from 0 to 32767 is required.', 'elapsed');
+  }
+  if (e.action === 'start') {
+    return ok({ ...state, result: state.result ?? { home: 0, away: 0, state: 'ongoing' } });
+  }
+  if (e.action === 'reset') {
+    const score = currentScore(state);
+    if (score.home !== 0 || score.away !== 0) {
+      return fail('score_not_zero', 'The game clock can only be reset at 0 - 0.');
+    }
+    return ok({ ...state, result: null });
+  }
+  return ok(state);
 }
 
 // Like the server's PATCH goals/{num}: allowed on a final game, since the result does not
@@ -505,6 +538,8 @@ export function reduce(state: GameState, event: GameEvent): Reduced {
     case 'cap':
     case 'remove_cap':
       return reduceCap(state, event);
+    case 'clock':
+      return reduceClock(state, event);
     case 'note': {
       // Like the server: trimmed, an empty text clears it, allowed on a final game.
       const text = event.text.trim();

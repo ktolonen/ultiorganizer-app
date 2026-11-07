@@ -58,6 +58,8 @@ export default function GameScreen() {
     // A local game has no server of its own: use whichever server templates are cached.
     useTemplates(isLocalGame(serverId) ? undefined : serverId),
     gameScope(serverId, gameId),
+    game.syncClock,
+    game.serverClock,
   );
   const [tab, setTab] = useState<Tab>('live');
   const [goalSide, setGoalSide] = useState<Side | null>(null);

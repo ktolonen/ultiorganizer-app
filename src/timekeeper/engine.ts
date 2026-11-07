@@ -331,6 +331,41 @@ export function resetClock(session: TimekeeperSession): TimekeeperSession {
   };
 }
 
+/** True while the clock has never run in this session (no reading, nothing marked). */
+export const clockUntouched = (session: TimekeeperSession): boolean =>
+  !session.clock.running && session.clock.accumMs === 0 && session.marks.length === 0;
+
+/**
+ * Takes over a clock another device or the browser Scorekeeper started: running from
+ * `elapsedSec` at `nowMs`, or paused at it.
+ */
+export function adoptClock(
+  session: TimekeeperSession,
+  clock: { running: boolean; elapsedSec: number },
+  nowMs: number,
+  caps: Caps,
+): TimekeeperSession {
+  const ms = Math.max(0, clock.elapsedSec) * 1000;
+  return {
+    ...session,
+    capConfig: session.capConfig ?? caps,
+    clock: clock.running
+      ? { running: true, startMs: nowMs - ms, accumMs: 0 }
+      : { running: false, startMs: 0, accumMs: ms },
+  };
+}
+
+/** What changed between two clocks, as the server's clock actions name it. */
+export function clockChange(
+  prev: GameClock,
+  next: GameClock,
+): 'start' | 'resume' | 'pause' | 'reset' | null {
+  if (!next.running && next.accumMs === 0 && (prev.running || prev.accumMs > 0)) return 'reset';
+  if (!prev.running && next.running) return prev.accumMs > 0 ? 'resume' : 'start';
+  if (prev.running && !next.running) return 'pause';
+  return null;
+}
+
 export type CapStatus = {
   /** The cap notice to show, or null. Time cap wins over halftime cap. */
   active: CapKind | null;

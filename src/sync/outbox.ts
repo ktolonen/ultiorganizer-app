@@ -28,6 +28,7 @@ export type RowOp =
   | 'delete_timeout'
   | 'delete_spirit_stoppage'
   | 'note'
+  | 'clock'
   | 'upload';
 
 export type RowStatus = 'pending' | 'sending' | 'sent' | 'failed';
@@ -52,6 +53,11 @@ export type OutboxRow = {
   serverNum?: number;
   /** A goal row: the goal's number on this phone when it was recorded. */
   localNum?: number;
+  /**
+   * A clock pause: the key of the `set` row queued right after it when the server's
+   * reading differs from the phone's (a start or resume that reached the server late).
+   */
+  followKey?: string;
   /**
    * Settled without being stored: a cap or note the server has no route for, or a note
    * it refused because the app token is not a personal one.
@@ -90,6 +96,8 @@ export type OutboxState = {
   correctionsAbsent?: boolean;
   /** The server has no note route, or refused a note (`user_token_required`): notes stay here. */
   noteRefused?: 'absent' | 'user_token_required';
+  /** The server has no clock route (it predates it): the clock stays on this phone. */
+  clockAbsent?: boolean;
 };
 
 export function newOutbox(
@@ -206,6 +214,17 @@ export function requestFor(event: GameEvent, ctx: RequestContext): Req | null {
       return null; // need the server's number: see deleteStoppageRequest and correctGoalRequest
     case 'note':
       return { op: 'note', method: 'PUT', path: `${base}/note`, body: { text: event.text.trim() } };
+    case 'clock':
+      return {
+        op: 'clock',
+        method: 'POST',
+        path: `${base}/clock`,
+        // The server refuses elapsed on anything but set.
+        body:
+          event.action === 'set'
+            ? { action: 'set', elapsed: event.elapsed }
+            : { action: event.action },
+      };
   }
 }
 
@@ -291,7 +310,9 @@ export const hasInFlight = (state: OutboxState): boolean =>
 
 const isCapOp = (op: RowOp): boolean => op === 'cap' || op === 'remove_cap';
 /** Ops whose data a full upload does not carry: they stay queued ahead of it. */
-const outsideUpload = (op: RowOp): boolean => isCapOp(op) || op === 'note';
+const outsideUpload = (op: RowOp): boolean => isCapOp(op) || op === 'note' || op === 'clock';
+/** The server's reading after a pause may differ by this much before the phone's is set. */
+export const CLOCK_DRIFT_SEC = 2;
 /** Corrections that fall back to a full upload when the live route cannot make them. */
 const isCorrectionOp = (op: RowOp): boolean =>
   op === 'correct_goal' || op === 'delete_timeout' || op === 'delete_spirit_stoppage';
@@ -426,7 +447,8 @@ export function onResponse(
   });
 
   if (res.kind === 'ok') {
-    const s = update(state, key, (r) => ({
+    const drift = clockFollowUp(row, res, now);
+    const s = update(drift ? insertAfter(state, key, drift) : state, key, (r) => ({
       ...r,
       status: 'sent',
       serverNum: res.num ?? r.serverNum,
@@ -449,6 +471,17 @@ export function onResponse(
     return {
       ...update(state, key, (r) => ({ ...r, status: 'sent', skipped: true, error: undefined })),
       capsAbsent: true,
+      nextAttemptAt: 0,
+      offline: false,
+    };
+  }
+  // The clock is outside the token. A refusal means the server's clock is somewhere else
+  // than the phone's (another device moved it, the game ended): the phone keeps its own and
+  // the queue goes on. A server without the route keeps the clock on the phone only.
+  if (row.op === 'clock' && (status === 409 || routeMissing(status, code))) {
+    return {
+      ...update(state, key, (r) => ({ ...r, status: 'sent', skipped: true, error: undefined })),
+      clockAbsent: routeMissing(status, code) ? true : state.clockAbsent,
       nextAttemptAt: 0,
       offline: false,
     };
@@ -506,6 +539,35 @@ export function onResponse(
     offline: false,
   };
 }
+
+/**
+ * After a pause, the `set` that puts the phone's reading on the server when they differ:
+ * a start or resume sent late (offline, retries) leaves the server's clock behind.
+ */
+function clockFollowUp(
+  row: OutboxRow,
+  res: Extract<Response, { kind: 'ok' }>,
+  now: number,
+): OutboxRow | null {
+  if (row.op !== 'clock' || !row.followKey || row.event?.type !== 'clock') return null;
+  if (row.event.action !== 'pause' || res.clock?.state !== 'paused') return null;
+  const phone = row.event.elapsed;
+  if (Math.abs(res.clock.elapsed - phone) <= CLOCK_DRIFT_SEC || phone > 32767) return null;
+  const event: GameEvent = { type: 'clock', action: 'set', elapsed: phone };
+  return {
+    ...newRow(
+      { op: 'clock', method: 'POST', path: row.path, body: { action: 'set', elapsed: phone } },
+      event,
+      row.followKey,
+      now,
+    ),
+  };
+}
+
+const insertAfter = (state: OutboxState, key: string, row: OutboxRow): OutboxState => {
+  const i = state.rows.findIndex((r) => r.key === key);
+  return { ...state, rows: [...state.rows.slice(0, i + 1), row, ...state.rows.slice(i + 1)] };
+};
 
 /** After a crash or relaunch a request may have been in flight: resend it with the same key. */
 export function recover(state: OutboxState): OutboxState {
@@ -620,6 +682,7 @@ export function planUndo(state: OutboxState, key: string): UndoPlan {
     case 'remove_cap':
     case 'correct_goal':
     case 'note':
+    case 'clock':
       return { kind: 'inverse' };
     case 'delete_goal':
     case 'delete_timeout':
