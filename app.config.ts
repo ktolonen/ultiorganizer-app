@@ -6,7 +6,7 @@ const isDev = process.env.APP_VARIANT === 'development';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: isDev ? 'Ultiorganizer Field (dev)' : 'Ultiorganizer Field',
+  name: isDev ? 'Ultiorganizer Scorekeeper (dev)' : 'Ultiorganizer Scorekeeper',
   slug: 'ultiorganizer-field',
   owner: 'ultiorganizer-team',
   version: '0.1.0',
@@ -29,7 +29,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: isDev ? 'org.ultiorganizer.field.dev' : 'org.ultiorganizer.field',
     adaptiveIcon: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: '#0050C8',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',

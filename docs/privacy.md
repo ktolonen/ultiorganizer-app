@@ -2,7 +2,7 @@
 
 > Draft for store listing. Review before publishing; the contact line and the data controller need filling in.
 
-Ultiorganizer Field keeps score and time limits for ultimate games. It has no accounts and no analytics.
+Ultiorganizer Scorekeeper keeps score and time limits for ultimate games. It has no accounts and no analytics.
 
 **What the app stores on your phone**
 

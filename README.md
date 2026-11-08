@@ -1,4 +1,4 @@
-# Ultiorganizer Field
+# Ultiorganizer Scorekeeper
 
 A phone app for the person at the sideline: WFDF time limits (Timekeeper) and score and scoresheet (Scorekeeper) on one screen, syncing with an [Ultiorganizer](../ultiorganizer) installation through its scorekeeping API. Expo / React Native, TypeScript, Android and iOS.
 
