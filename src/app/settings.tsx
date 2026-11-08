@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
@@ -110,6 +111,7 @@ export default function Settings() {
         />
 
         <Divider />
+        <Txt muted>{t('settings.version', { version: Constants.expoConfig?.version ?? '?' })}</Txt>
         <Button label={t('common.back')} kind="secondary" onPress={() => router.back()} />
       </ScrollView>
     </Screen>

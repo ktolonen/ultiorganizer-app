@@ -75,6 +75,7 @@
   "settings.autoPoint.hint": "Start the Start of point timer automatically after each goal.",
   "settings.scorekeeper.hint": "Filled in for games that have no scorekeeper yet. Change it per game on the Sheet tab.",
   "settings.scorekeeper.placeholder": "Your name",
+  "settings.version": "Version {{version}}",
   "settings.on": "On",
   "settings.off": "Off",
   "common.cancel": "Cancel",
