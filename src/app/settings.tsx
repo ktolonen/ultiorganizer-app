@@ -1,10 +1,11 @@
 import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { cleanOfficial, MAX_OFFICIAL_LENGTH } from '../game/reducer';
 import { AUTO_POINT_KEY, parseAutoPoint, SCOREKEEPER_KEY, type ServerRow } from '../store/repo';
+import { deleteAppToken, deleteLinkToken, deleteSavedLinkToken } from '../store/secure';
 import { getRepo } from '../store/sqlite';
 import { Button, Divider, layout, Screen, TextField, Txt } from '../ui/components';
 import { useThemeMode, type ThemeMode } from '../ui/theme';
@@ -30,6 +31,34 @@ export default function Settings() {
     }, []),
   );
 
+  // Forgetting deletes the server's games from this phone, with any entries not yet sent,
+  // so it is always confirmed. The tokens go after the rows: a crash in between only
+  // leaves unused keys, never a server without its token.
+  const doForget = async (server: ServerRow) => {
+    const repo = await getRepo();
+    const games = await repo.listGames(server.id);
+    const links = await repo.listLinks(server.id);
+    await repo.removeServer(server.id);
+    for (const g of games) await deleteLinkToken(server.id, g.gameId);
+    for (const l of links) await deleteSavedLinkToken(l.id);
+    await deleteAppToken(server.id);
+    setServers(await repo.listServers());
+  };
+  const forget = async (server: ServerRow) => {
+    const games = await (await getRepo()).listGames(server.id);
+    const unsent = games.reduce((n, g) => n + g.unsent, 0);
+    Alert.alert(
+      server.label,
+      unsent > 0
+        ? t('settings.forget.unsent', { count: unsent })
+        : t('settings.forget.confirm', { count: games.length }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('settings.forget'), style: 'destructive', onPress: () => void doForget(server) },
+      ],
+    );
+  };
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={layout.scroll}>
@@ -45,7 +74,12 @@ export default function Settings() {
         ) : (
           <View style={{ gap: 4 }}>
             {servers.map((s) => (
-              <Txt key={s.id}>{s.label}</Txt>
+              <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Txt>{s.label}</Txt>
+                </View>
+                <Button label={t('settings.forget')} kind="secondary" onPress={() => forget(s)} />
+              </View>
             ))}
           </View>
         )}
