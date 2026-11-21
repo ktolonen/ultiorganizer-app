@@ -1,5 +1,9 @@
 # Development
 
+The app is built with Expo and React Native in TypeScript, for Android and iOS. Its scorekeeping and timekeeping logic lives in pure modules with unit tests; see [architecture](architecture.md).
+
+Not done yet on the development side: end-to-end tests on devices and contract tests against a live server.
+
 ## Setup
 
 ```sh
