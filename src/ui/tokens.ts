@@ -1,4 +1,4 @@
-/** Design tokens from PLAN.md "Visual design". Neutral UI; colour comes from the teams. */
+/** Design tokens from docs/design.md. Neutral UI; colour comes from the teams. */
 
 export type Palette = {
   surface: string;

@@ -493,7 +493,7 @@ export function RosterEditor({
             </View>
             {entry && (
               <>
-                {/* Approved narrow-table abbreviations from docs/terminology.md; not translated. */}
+                {/* Approved narrow-table abbreviations from the server's docs/terminology.md; not translated. */}
                 <Chip
                   label="C"
                   selected={entry.captain}

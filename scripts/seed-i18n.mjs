@@ -1,5 +1,5 @@
 // Seeds the shared terms of the app catalogs from the ultiorganizer .po files, so
-// the app and the website use the same words (docs/terminology.md).
+// the app and the website use the same words (the server's docs/terminology.md).
 // Usage: node scripts/seed-i18n.mjs [path-to-ultiorganizer]
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

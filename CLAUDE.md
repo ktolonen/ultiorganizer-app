@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-AGENTS.md is the Expo guidance for this repo and applies in full: fetch the versioned Expo docs before touching Expo, EAS or React Native APIs, use `npx expo install` for dependencies, and never hand-edit `ios/` or `android/` (they are generated). Ultiorganizer Field is the sideline companion for an Ultiorganizer server; README.md has the setup, PLAN.md the intended design, STATUS.md what is actually built.
+AGENTS.md is the Expo guidance for this repo and applies in full: fetch the versioned Expo docs before touching Expo, EAS or React Native APIs, use `npx expo install` for dependencies, and never hand-edit `ios/` or `android/` (they are generated). Ultiorganizer Scorekeeper is the sideline companion for an Ultiorganizer server. README.md is the overview and current status; `docs/` has the user guide, architecture, design, development, releasing and privacy docs. Keep them in step with the code when behaviour changes.
 
 ## Commands
 
@@ -44,4 +44,4 @@ Failures are handled by pausing the queue rather than skipping rows. A refused w
 
 **i18n.** Catalogs are in `src/i18n/locales/` (en, fi, de, es). Shared terms come from the server `.po` files via `npm run i18n:seed`. Server-provided signal texts are not translated here yet.
 
-The server code is in a sibling checkout, `../ultiorganizer`, and is not part of this repo. Changes that need server support are noted as blocked in STATUS.md, not implemented here.
+The server code is in a sibling checkout, `../ultiorganizer`, and is not part of this repo. Changes that need server support are made there first, not worked around here; list anything still waiting for the server under Status in README.md.

@@ -2,7 +2,7 @@ import type { EligiblePlayer, EntryContext, GameResult, RosterEntry, Rules, Side
 
 /**
  * Pure game state over the event log. Every rule here mirrors what the server
- * enforces (docs/api.md, "Scorekeeping app endpoints"), so an event the reducer
+ * enforces (the server's docs/api.md, "Scorekeeping app endpoints"), so an event the reducer
  * accepts is one the server should accept, and an event it refuses never enters
  * the outbox.
  */

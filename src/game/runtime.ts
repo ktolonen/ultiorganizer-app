@@ -232,7 +232,7 @@ export function resolveNeedsUpload(session: GameSession, deps: Deps): GameSessio
   };
 }
 
-/** Undoes the most recent goal by the rules in PLAN.md "Undo". */
+/** Undoes the most recent goal by the rules in docs/architecture.md "Undo and corrections". */
 export function undoLastGoal(session: GameSession, deps: Deps): ApplyResult {
   const last = session.state.goals[session.state.goals.length - 1];
   if (!last)
