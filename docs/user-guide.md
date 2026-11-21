@@ -22,7 +22,7 @@ In the app, tap _Pair a server_ and scan the setup QR, or paste the server addre
 3. The game has four tabs:
    - **Rosters**: tap players to put them on the game roster. Team captain and Spirit captain show as `C` and `SC`.
    - **Live**: the score, the game clock, the Timekeeper and the actions. Tap a team's score to record a goal: tap the assist, then the scorer. _Callahan_ and _Unknown_ are above the player grid. Without rosters, tapping a score just counts the point.
-   - **Sheet**: the goal list, timeouts, spirit stoppages, caps, starting offence, halftime and the scorekeeper's name. Tap a goal to change its players.
+   - **Sheet**: the goal list, timeouts, spirit stoppages, caps, starting offence, halftime and the scorekeeper's name. Tap a goal to change its players (for a team with a roster). _Undo last goal_ removes the latest goal.
    - **Finish**: the final result, the game note and the sync state. _Finish game_ asks you to confirm the score before saving it as final.
 
 The goal times come from the game clock. Starting the game clock also starts the game on the server. The server shows the clock as the app runs it.

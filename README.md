@@ -14,10 +14,10 @@ A phone app for the person at the sideline of an ultimate game. It keeps the WFD
 
 - **Pick the rosters** by tapping the players who are at the game. Captains and Spirit captains are marked.
 - **Record goals** with two taps: the assist, then the scorer. Callahans and unknown players have their own buttons, and without rosters a tap on the score just counts the point.
-- **Record everything else on the sheet**: timeouts, spirit stoppages, caps, the starting offence and halftime.
+- **Record everything else on the sheet**: timeouts, spirit stoppages (when the event uses them), caps, the starting offence and halftime.
 - **Run the game clock**. Goal times come from it, starting it starts the game on the tournament site, and spectators see the clock as you run it.
-- **Fix mistakes** by tapping a goal to change its players, or undo the last goal.
-- **Finish the game** by confirming the final score, and add a game note for the organisers.
+- **Fix mistakes** by tapping a goal to change its players, or undoing the last goal.
+- **Finish the game** by confirming the final score, and, with your own app token, add a game note for the organisers.
 
 ### Keep time
 
