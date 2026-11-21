@@ -52,7 +52,7 @@ The app is in English. Finnish, German and Spanish cover the shared game terms (
 
 Version 0.1.0 is the first release, and everything above is in it. Still to come: iOS builds, a landscape layout, a screen reader pass with VoiceOver and TalkBack, full Finnish, German and Spanish translations, and store listings.
 
-Waiting for the server: the event's _Scorekeeping app_ setting is not in Ultiorganizer's main branch yet. Until it is, any paired app token can keep score at every event of the installation.
+Waiting for the server: the event's _Scorekeeping app_ setting is not in Ultiorganizer's main branch yet. Until it is, the server does not check it, and a paired app token works with any scorekeeping link its scope covers.
 
 ## Documentation
 
