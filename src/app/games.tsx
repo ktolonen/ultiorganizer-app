@@ -58,7 +58,7 @@ export default function Games() {
       }
       setError(
         res.kind === 'http'
-          ? t('games.error.http', { code: res.code })
+          ? t(`error.${res.code}`, { defaultValue: t('games.error.http', { code: res.code }) })
           : res.kind === 'no_server'
             ? t('error.unknown', { code: 'no_server' })
             : t(`games.error.${res.kind}`),

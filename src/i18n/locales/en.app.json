@@ -132,6 +132,7 @@
   "error.forfeit": "This game is a forfeit.",
   "error.event_readonly": "This event is read-only.",
   "error.invalid_scorekeeping_token": "The scorekeeping link is no longer valid.",
+  "error.scorekeeping_app_not_allowed": "This event does not allow your app token. Ask an event admin to check the event's Scorekeeping app setting.",
   "error.unknown": "Something went wrong ({{code}}).",
   "game.colors": "Team colours",
   "game.tab.live": "Live",

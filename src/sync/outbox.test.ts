@@ -300,6 +300,7 @@ describe('other failures', () => {
     for (const [status, code] of [
       [401, 'invalid_scorekeeping_token'],
       [403, 'invalid_scope'],
+      [403, 'scorekeeping_app_not_allowed'],
     ] as const) {
       const s = step(add(fresh(), goalEv(1)), { kind: 'http', status, code }).state;
       expect(s.paused).toMatchObject({ reason: 'auth' });

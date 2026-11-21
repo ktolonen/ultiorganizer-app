@@ -427,6 +427,7 @@ const AUTH_CODES = new Set([
   'event_scope_mismatch',
   'game_not_covered',
   'event_readonly',
+  'scorekeeping_app_not_allowed',
 ]);
 
 /** Applies the outcome of the request for `key`. */
