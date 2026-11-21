@@ -54,3 +54,7 @@ src/pairing/     QR parsing
 src/i18n/        catalogs en/fi/de/es (shared terms seeded from the server .po files)
 src/ui/          tokens, theme, shared components
 ```
+
+## License
+
+Ultiorganizer Scorekeeper is released under the [GNU General Public License v3](LICENSE) or (at your option) any later version, the same as Ultiorganizer. The Timekeeper engine is a port of the server's `script/timekeeper.js`, and the shared terms in the fi, de and es catalogs come from the server's translations.
