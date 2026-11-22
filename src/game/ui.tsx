@@ -20,17 +20,7 @@ import {
 } from './reducer';
 import type { RosterEntry, Side } from './types';
 
-const nameOf = (state: GameState, side: Side, id: number | null): string => {
-  if (id === null) return '?';
-  return state.eligible[side].find((p) => p.player_id === id)?.name ?? `#${id}`;
-};
-
-const numberOf = (state: GameState, side: Side, id: number): string => {
-  const onRoster = state.rosters[side].find((p) => p.player_id === id);
-  return onRoster?.number != null ? String(onRoster.number) : '–';
-};
-
-export { nameOf, numberOf };
+export { assistLabel, nameOf, numberOf, playerLabel } from './players';
 
 /** One flooded half of the live screen: team colour, score, timeouts left, and ±1 buttons. */
 // Smaller than SIZE.score so the action buttons below get the room.

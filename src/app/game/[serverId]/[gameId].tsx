@@ -15,9 +15,9 @@ import {
   CapSheet,
   ColorPicker,
   GoalSheet,
-  nameOf,
+  assistLabel,
   NoteField,
-  numberOf,
+  playerLabel,
   RosterEditor,
   ScorekeeperField,
   TeamHalf,
@@ -195,15 +195,8 @@ export default function GameScreen() {
   };
 
   const goalLine = (g: (typeof state.goals)[number]) => {
-    const scorer =
-      g.scorerId !== null
-        ? `${numberOf(state, g.side, g.scorerId)} ${nameOf(state, g.side, g.scorerId)}`
-        : '?';
-    const assist = g.callahan
-      ? t('term.callahan')
-      : g.assistId !== null
-        ? nameOf(state, g.side, g.assistId)
-        : '?';
+    const scorer = playerLabel(state, g.side, g.scorerId);
+    const assist = g.callahan ? t('term.callahan') : assistLabel(state, g.side, g.assistId);
     return `${g.num}. ${g.homeScore}–${g.awayScore}  ${scorer} ← ${assist}${g.time !== null ? `  ${formatTime(g.time)}` : ''}`;
   };
 

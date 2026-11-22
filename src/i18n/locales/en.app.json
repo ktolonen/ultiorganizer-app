@@ -169,7 +169,7 @@
   "home.local": "Local game (this phone only)",
   "home.localOnly": "This phone only",
   "local.title": "Local game",
-  "local.body": "For a game the server does not know, for example after a late schedule change. It is kept on this phone only: it is not linked to the server and is never uploaded, so enter the result in Ultiorganizer afterwards. Without players, points are counted with +1 and −1.",
+  "local.body": "For a game the server does not know, for example after a late schedule change. It is kept on this phone only: it is not linked to the server and is never uploaded, so enter the result in Ultiorganizer afterwards. There are no player names: +1 asks for the assist's and the scorer's jersey numbers.",
   "local.home": "Home team",
   "local.away": "Away team",
   "local.field": "Field (optional)",

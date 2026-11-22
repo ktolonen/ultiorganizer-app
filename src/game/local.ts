@@ -7,13 +7,33 @@ import { entryContextSchema, type EntryContext } from './types';
  * Local games are kept on this phone only, under a reserved server row (`LOCAL_SERVER_ID`,
  * created by a migration). They are a backup for a game the server does not know, for
  * example after an ad hoc schedule change mid-tournament: never linked to a server game,
- * never uploaded. With no server there are no players, so a local game keeps the result
- * with +1 and −1, timeouts, spirit stoppages, caps and the clock.
+ * never uploaded. With no server there are no player names: each team gets a roster of
+ * jersey numbers instead, so goals record the scorer's and assist's numbers like a server
+ * game. Local games made before the numbers existed have empty rosters and keep the result
+ * with +1 and −1.
  */
 export const LOCAL_SERVER_ID = 0;
 export const isLocalGame = (serverId: number) => serverId === LOCAL_SERVER_ID;
 
 export const MAX_TEAM_NAME = 50;
+
+/** Jersey numbers 0-99: exactly the server's 100-player roster limit. */
+export const LOCAL_NUMBERS = 100;
+/** A local game's player for a jersey number. Ids start at 1, never 0. */
+export const localPlayerId = (number: number) => number + 1;
+
+function numberRoster() {
+  const numbers = Array.from({ length: LOCAL_NUMBERS }, (_, n) => n);
+  return {
+    eligible_players: numbers.map((n) => ({ player_id: localPlayerId(n), name: '', number: n })),
+    roster: numbers.map((n) => ({
+      player_id: localPlayerId(n),
+      number: n,
+      captain: false,
+      spirit_captain: false,
+    })),
+  };
+}
 export const DEFAULT_LOCAL_TIMEOUTS = 2;
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -42,7 +62,7 @@ export function localEntryContext(
   nowMs: number,
 ): EntryContext {
   const name = (s: string) => s.trim().slice(0, MAX_TEAM_NAME).trim() || null;
-  const side = (n: string) => ({ team_id: null, name: name(n), eligible_players: [], roster: [] });
+  const side = (n: string) => ({ team_id: null, name: name(n), ...numberRoster() });
   return entryContextSchema.parse({
     game: {
       game_id: gameId,

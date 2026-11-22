@@ -82,7 +82,7 @@ After a link's game list loads, the list and the entry context of each game not 
 
 Opening a game or its list falls back to saved data when the server can't answer (no connection, timeout, `408`/`429`, any `5xx`, or a body that is not the server's), never on a refusal: a `401`/`403`/`404` still shows an error. A game opened that way is an ordinary game; its entries queue as during any outage, and a server that moved on in the meantime surfaces through the conflict sheet. Saved data is dropped a week after it was fetched, when its game is opened, or with its server.
 
-Local games belong to a reserved server row (id 0, root `local:`). Their entry context is built on the phone with no players, their outbox is offline-only and never sends, and they are never purged automatically.
+Local games belong to a reserved server row (id 0, root `local:`). Their entry context is built on the phone with a roster of jersey numbers 0–99 per team (unnamed players, id = number + 1), so goals go through the same reducer rules as a server game; local games saved before that have empty rosters and count score taps. Their outbox is offline-only and never sends, and they are never purged automatically.
 
 ## Timekeeper
 
