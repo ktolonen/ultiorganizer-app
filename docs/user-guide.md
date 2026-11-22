@@ -41,7 +41,7 @@ Some corrections, such as removing an older timeout, can't be sent as a single c
 
 When a field link's game list loads, the app also saves its games in the background. They open later without a connection, and the entries are sent when the connection returns. The saved data is kept for a week.
 
-For a game the server doesn't know, for example after a late schedule change, tap _Keep score on this phone only_: type the team names and keep the result, timeouts and the clock. A local game stays on this phone and is never uploaded, so enter its result in Ultiorganizer afterwards.
+For a game the server doesn't know, for example after a late schedule change, use _Local game_: type the team names and keep the result, timeouts and the clock. A local game stays on this phone and is never uploaded, so enter its result in Ultiorganizer afterwards.
 
 ## Timekeeper
 
