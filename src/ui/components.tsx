@@ -91,6 +91,7 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        icon ? styles.withIcon : null,
         {
           height: TARGET[size],
           backgroundColor: primary ? palette.ink : palette.surface,
@@ -108,7 +109,7 @@ export function Button({
         adjustsFontSizeToFit
         minimumFontScale={0.5}
         style={{
-          flexShrink: 1,
+          flexShrink: icon ? 1 : undefined,
           fontFamily: FONTS.textBold,
           fontSize: SIZE.md,
           color: primary ? palette.surface : palette.ink,
@@ -167,10 +168,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: 12,
     paddingHorizontal: SPACE.lg,
-    flexDirection: 'row',
-    gap: SPACE.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  withIcon: { flexDirection: 'row', gap: SPACE.sm },
   field: { gap: SPACE.xs },
 });

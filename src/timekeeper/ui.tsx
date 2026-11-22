@@ -8,6 +8,15 @@ import { FONTS, SIZE, SPACE, readableOn, TARGET } from '../ui/tokens';
 import type { TimekeeperApi } from './useTimekeeper';
 import type { ActionId } from './templates';
 
+// Marks the app itself adds are stored with an English label; show them in the current
+// language. Action marks keep the template's own label.
+const MARK_KEYS: Record<string, string> = {
+  pause: 'timekeeper.pause',
+  mark: 'timekeeper.mark',
+  cap_half_time: 'term.halftimeCap',
+  cap_time: 'term.timeCap',
+};
+
 export const formatTime = (totalSeconds: number): string => {
   const sign = totalSeconds < 0 ? '-' : '';
   const s = Math.abs(Math.floor(totalSeconds));
@@ -251,7 +260,7 @@ export function GameClockPanel({ tk, compact }: { tk: TimekeeperApi; compact?: b
           {[...tk.session.marks].reverse().map((m, i) => (
             <View key={`${m.key}-${m.number}-${i}`} style={styles.markRow}>
               <Txt variant="small" style={{ color: ink }}>
-                {m.label} {m.number}
+                {MARK_KEYS[m.key] ? t(MARK_KEYS[m.key]) : m.label} {m.number}
               </Txt>
               <Txt variant="small" style={{ color: ink, fontFamily: FONTS.figuresSemi }}>
                 {formatTime(m.seconds)}

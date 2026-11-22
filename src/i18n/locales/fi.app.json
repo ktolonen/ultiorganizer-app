@@ -71,6 +71,7 @@
   "timekeeper.templateHint": "Uudet rajat ovat voimassa seuraavasta toiminnosta alkaen. Jo käynnistetty pelikello pitää omat rajansa.",
   "timekeeper.notifications": "Merkinannot jatkuvat taustalla, kun ilmoitukset on sallittu.",
   "timekeeper.notification.title": "{{action}}",
+  "timekeeper.channel": "Timekeeper-merkinannot",
   "settings.title": "Asetukset",
   "settings.serversEmpty": "Ei yhdistettyjä palvelimia.",
   "settings.theme": "Teema",

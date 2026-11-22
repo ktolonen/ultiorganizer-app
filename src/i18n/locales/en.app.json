@@ -71,6 +71,7 @@
   "timekeeper.templateHint": "The new limits apply from the next action. A game clock that has already started keeps its caps.",
   "timekeeper.notifications": "Signals continue in the background when notifications are allowed.",
   "timekeeper.notification.title": "{{action}}",
+  "timekeeper.channel": "Timekeeper signals",
   "settings.title": "Settings",
   "settings.serversEmpty": "No servers paired.",
   "settings.theme": "Theme",

@@ -4,6 +4,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance, SchedulableTriggerInputTypes } from 'expo-notifications';
 import { Platform } from 'react-native';
+import i18n from '../i18n';
 import type { ScheduledSignal, SignalKind } from './engine';
 import { GO_TONES, WARN_TONES, makeWav } from './wav';
 
@@ -72,7 +73,8 @@ export async function ensureNotificationPermission(): Promise<boolean> {
   try {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(CHANNEL, {
-        name: 'Timekeeper signals',
+        // Shown in the system's notification settings; renamed when the language changes.
+        name: i18n.t('timekeeper.channel'),
         importance: AndroidImportance.HIGH,
         // No `sound` key: omitting it gives the system default. A string here is
         // looked up as a bundled file, and 'default' logs "custom sound not found".

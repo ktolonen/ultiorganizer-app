@@ -71,6 +71,7 @@
   "timekeeper.templateHint": "Die neuen Limits gelten ab der nächsten Aktion. Eine bereits gestartete Spieluhr behält ihre Grenzen.",
   "timekeeper.notifications": "Signale laufen im Hintergrund weiter, wenn Mitteilungen erlaubt sind.",
   "timekeeper.notification.title": "{{action}}",
+  "timekeeper.channel": "Timekeeper-Signale",
   "settings.title": "Einstellungen",
   "settings.serversEmpty": "Keine Server gekoppelt.",
   "settings.theme": "Design",
