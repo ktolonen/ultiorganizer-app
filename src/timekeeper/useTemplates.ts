@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { credentialsFor } from '../services/session';
 import { refreshTemplates } from '../services/templates';
 import { getRepo } from '../store/sqlite';
-import i18n from '../i18n';
 import { BUNDLED_TEMPLATES, type TemplateSet } from './templates';
 
 /**
@@ -12,6 +12,8 @@ import { BUNDLED_TEMPLATES, type TemplateSet } from './templates';
  */
 export function useTemplates(serverId?: number): TemplateSet {
   const [templates, setTemplates] = useState<TemplateSet>(BUNDLED_TEMPLATES);
+  // Refetched when the language changes in Settings, for the server's translated names.
+  const { language } = useTranslation().i18n;
   useEffect(() => {
     let live = true;
     void (async () => {
@@ -32,7 +34,7 @@ export function useTemplates(serverId?: number): TemplateSet {
           repo,
           serverId: id,
           creds,
-          language: i18n.language,
+          language,
         });
         if (fresh?.templates.length && live) {
           setTemplates(fresh);
@@ -43,6 +45,6 @@ export function useTemplates(serverId?: number): TemplateSet {
     return () => {
       live = false;
     };
-  }, [serverId]);
+  }, [serverId, language]);
   return templates;
 }

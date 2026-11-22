@@ -9,7 +9,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { initI18n } from '../i18n';
+import { initI18n, LANGUAGE_KEY, parseLanguagePref, setLanguage } from '../i18n';
 import { deleteLinkToken, deleteSavedLinkToken } from '../store/secure';
 import { getRepo } from '../store/sqlite';
 import { parseThemeMode, useTheme, useThemeMode } from '../ui/theme';
@@ -37,6 +37,8 @@ export default function RootLayout() {
       try {
         const repo = await getRepo();
         setMode(parseThemeMode(await repo.getSetting('theme')));
+        // Before the splash hides, so a chosen language never flashes the device one.
+        setLanguage(parseLanguagePref(await repo.getSetting(LANGUAGE_KEY)));
         // Local game data is deleted 30 days after a game is finalized and synced.
         for (const g of await repo.purgeOldGames(Date.now())) {
           await deleteLinkToken(g.serverId, g.gameId);

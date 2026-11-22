@@ -1,16 +1,49 @@
 import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, Image, type ImageSourcePropType, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { cleanOfficial, MAX_OFFICIAL_LENGTH } from '../game/reducer';
+import {
+  LANGUAGE_KEY,
+  LANGUAGE_NAMES,
+  LANGUAGES,
+  type Language,
+  type LanguagePref,
+  parseLanguagePref,
+  setLanguage,
+} from '../i18n';
 import { AUTO_POINT_KEY, parseAutoPoint, SCOREKEEPER_KEY, type ServerRow } from '../store/repo';
 import { deleteAppToken, deleteLinkToken, deleteSavedLinkToken } from '../store/secure';
 import { getRepo } from '../store/sqlite';
 import { Button, Divider, layout, Screen, TextField, Txt } from '../ui/components';
-import { useThemeMode, type ThemeMode } from '../ui/theme';
+import { useTheme, useThemeMode, type ThemeMode } from '../ui/theme';
 
 const MODES: ThemeMode[] = ['system', 'light', 'dark'];
+
+// The flags of the server's own language menu (ultiorganizer images/flags/medium).
+const FLAGS: Record<Language, { source: ImageSourcePropType; aspect: number }> = {
+  en: { source: require('../../assets/images/flags/en.png'), aspect: 235 / 117 },
+  fi: { source: require('../../assets/images/flags/fi.png'), aspect: 235 / 139 },
+  de: { source: require('../../assets/images/flags/de.png'), aspect: 236 / 157 },
+  es: { source: require('../../assets/images/flags/es.png'), aspect: 235 / 153 },
+};
+
+function Flag({ lang }: { lang: Language }) {
+  const { palette } = useTheme();
+  return (
+    <Image
+      source={FLAGS[lang].source}
+      accessible={false}
+      style={{
+        height: 18,
+        aspectRatio: FLAGS[lang].aspect,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: palette.line,
+      }}
+    />
+  );
+}
 
 export default function Settings() {
   const { t } = useTranslation();
@@ -19,6 +52,7 @@ export default function Settings() {
   const [servers, setServers] = useState<ServerRow[]>([]);
   const [autoPoint, setAutoPoint] = useState(true);
   const [scorekeeper, setScorekeeper] = useState('');
+  const [language, setLanguagePref] = useState<LanguagePref>('system');
 
   // Reload on focus so a server paired from here shows up on return.
   useFocusEffect(
@@ -27,6 +61,7 @@ export default function Settings() {
         setServers(await repo.listServers());
         setAutoPoint(parseAutoPoint(await repo.getSetting(AUTO_POINT_KEY)));
         setScorekeeper((await repo.getSetting(SCOREKEEPER_KEY)) ?? '');
+        setLanguagePref(parseLanguagePref(await repo.getSetting(LANGUAGE_KEY)));
       });
     }, []),
   );
@@ -57,6 +92,12 @@ export default function Settings() {
         { text: t('settings.forget'), style: 'destructive', onPress: () => void doForget(server) },
       ],
     );
+  };
+
+  const chooseLanguage = async (pref: LanguagePref) => {
+    setLanguagePref(pref);
+    setLanguage(pref);
+    await (await getRepo()).setSetting(LANGUAGE_KEY, pref);
   };
 
   return (
@@ -107,6 +148,31 @@ export default function Settings() {
           returnKeyType="done"
           accessibilityLabel={t('term.scorekeeper')}
         />
+
+        <Divider />
+        <Txt variant="heading" accessibilityRole="header">
+          {t('settings.language')}
+        </Txt>
+        <Button
+          label={t('settings.language.system')}
+          kind={language === 'system' ? 'primary' : 'secondary'}
+          onPress={() => void chooseLanguage('system')}
+        />
+        {/* Two per row; each language is named in itself, so the way back is always readable. */}
+        {[LANGUAGES.slice(0, 2), LANGUAGES.slice(2)].map((pair) => (
+          <View key={pair.join()} style={layout.row}>
+            {pair.map((lang) => (
+              <View key={lang} style={{ flex: 1 }}>
+                <Button
+                  label={LANGUAGE_NAMES[lang]}
+                  icon={<Flag lang={lang} />}
+                  kind={language === lang ? 'primary' : 'secondary'}
+                  onPress={() => void chooseLanguage(lang)}
+                />
+              </View>
+            ))}
+          </View>
+        ))}
 
         <Divider />
         <Txt variant="heading" accessibilityRole="header">

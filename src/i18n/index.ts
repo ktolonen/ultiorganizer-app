@@ -1,27 +1,46 @@
 import { createInstance } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { getLocales } from 'expo-localization';
-import de from './locales/de.json';
+import deApp from './locales/de.app.json';
+import deTerms from './locales/de.terms.json';
 import enApp from './locales/en.app.json';
 import enTerms from './locales/en.terms.json';
-import es from './locales/es.json';
-import fi from './locales/fi.json';
+import esApp from './locales/es.app.json';
+import esTerms from './locales/es.terms.json';
+import fiApp from './locales/fi.app.json';
+import fiTerms from './locales/fi.terms.json';
 
 const i18n = createInstance();
 
 export const LANGUAGES = ['en', 'fi', 'de', 'es'] as const;
 export type Language = (typeof LANGUAGES)[number];
 
+/** The language's own name, so a user who picked the wrong one can still find theirs. */
+export const LANGUAGE_NAMES: Record<Language, string> = {
+  en: 'English',
+  fi: 'Suomi',
+  de: 'Deutsch',
+  es: 'Español',
+};
+
+/** The Settings choice: a fixed language, or whatever the device uses. */
+export type LanguagePref = Language | 'system';
+export const LANGUAGE_KEY = 'language';
+
+export function parseLanguagePref(value: string | null | undefined): LanguagePref {
+  return (LANGUAGES as readonly string[]).includes(value ?? '') ? (value as Language) : 'system';
+}
+
 /**
- * English is complete. fi, de and es hold the shared terms seeded from the server
- * `.po` catalogs (`npm run i18n:seed`); every other string falls back to English
- * until the translations are reviewed.
+ * Each language is its `*.terms.json`, the shared terms seeded from the server `.po`
+ * catalogs (`npm run i18n:seed` rewrites only those), plus its `*.app.json`, the app's own
+ * strings. A term the server has not translated falls back to English.
  */
 export const resources = {
   en: { translation: { ...enTerms, ...enApp } },
-  fi: { translation: fi },
-  de: { translation: de },
-  es: { translation: es },
+  fi: { translation: { ...fiTerms, ...fiApp } },
+  de: { translation: { ...deTerms, ...deApp } },
+  es: { translation: { ...esTerms, ...esApp } },
 } as const;
 
 export function pickLanguage(codes: readonly string[]): Language {
@@ -32,8 +51,10 @@ export function pickLanguage(codes: readonly string[]): Language {
   return 'en';
 }
 
+const deviceLanguage = (): Language => pickLanguage(getLocales().map((l) => l.languageTag));
+
 export function initI18n(language?: Language) {
-  const lng = language ?? pickLanguage(getLocales().map((l) => l.languageTag));
+  const lng = language ?? deviceLanguage();
   if (!i18n.isInitialized) {
     void i18n.use(initReactI18next).init({
       resources,
@@ -48,6 +69,11 @@ export function initI18n(language?: Language) {
     void i18n.changeLanguage(language);
   }
   return i18n;
+}
+
+/** Applies the Settings choice; 'system' follows the device language. */
+export function setLanguage(pref: LanguagePref) {
+  initI18n(pref === 'system' ? deviceLanguage() : pref);
 }
 
 /** Translated signal text; unknown texts (custom templates) are shown as the server sent them. */

@@ -46,13 +46,15 @@ Android: download the APK from [Releases](https://github.com/ktolonen/ultiorgani
 
 To keep score, the Ultiorganizer installation needs the scorekeeping API, and the event's _Scorekeeping app_ setting has to admit you. Timekeeper-only mode needs neither. The [user guide](docs/user-guide.md) walks through pairing a server and keeping a game.
 
-The app is in English. Finnish, German and Spanish cover the shared game terms (goal, timeout, spirit stoppage…) so far, and the rest falls back to English.
+The app is in English, Finnish, German and Spanish. It follows the phone's language, and _Language_ in Settings picks one of the four instead. The game terms (goal, timeout, spirit stoppage…) are the server's own translations, so the app and the website use the same words.
 
 ## Status
 
+The server's translations do not have _Team captain_ or the Timekeeper's built-in signal texts (_Offence warning_, _Start of play_…) yet, so those stay in English until the server's `.po` files have them and `npm run i18n:seed` is run again. Signal texts from the server's own templates are translated by the server.
+
 Pasting the setup link on the pairing screen needs the server's copyable setup link on the Scorekeeping app page (ktolonen/ultiorganizer#152, not merged yet). Until then, paste the address and the token.
 
-Version 0.1.0 is the first release, and everything above is in it. Still to come: iOS builds, a landscape layout, a screen reader pass with VoiceOver and TalkBack, full Finnish, German and Spanish translations, and store listings.
+Version 0.1.0 is the first release, and everything above is in it. Still to come: iOS builds, a landscape layout, a screen reader pass with VoiceOver and TalkBack, a native speaker's review of the Finnish, German and Spanish strings, and store listings.
 
 ## Documentation
 
@@ -70,4 +72,4 @@ For developers:
 
 ## License
 
-Ultiorganizer Scorekeeper is released under the [GNU General Public License v3](LICENSE) or (at your option) any later version, the same as Ultiorganizer. The Timekeeper engine is a port of the server's `script/timekeeper.js`, and the shared terms in the fi, de and es catalogs come from the server's translations.
+Ultiorganizer Scorekeeper is released under the [GNU General Public License v3](LICENSE) or (at your option) any later version, the same as Ultiorganizer. The Timekeeper engine is a port of the server's `script/timekeeper.js`, the shared terms in the fi, de and es catalogs come from the server's translations, and the language flags are the server's.

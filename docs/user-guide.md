@@ -29,6 +29,8 @@ The goal times come from the game clock. Starting the game clock also starts the
 
 Your name in Settings is filled in as the game's scorekeeper when a game opens without one.
 
+The app follows the phone's language when it is English, Finnish, German or Spanish, and English otherwise. _Language_ in Settings picks one of the four instead, and _Device language_ goes back to following the phone.
+
 ### Sync status
 
 The game header always shows whether the entries have reached the server: _Synced_, _Sending_, _N queued_, _Offline, N queued_, or _Needs attention_. Entries are saved on the phone before they are sent, and they are sent in order, so closing the app or losing the connection loses nothing. _Send now_ retries at once.

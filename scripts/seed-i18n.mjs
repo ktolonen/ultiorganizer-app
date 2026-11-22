@@ -88,7 +88,7 @@ for (const [lng, dir] of Object.entries(catalogs)) {
     else missing.push(msgid);
   }
   writeFileSync(
-    join(import.meta.dirname, `../src/i18n/locales/${lng}.json`),
+    join(import.meta.dirname, `../src/i18n/locales/${lng}.terms.json`),
     JSON.stringify(out, null, 2) + '\n',
   );
   console.log(`${lng}: ${Object.keys(out).length} seeded, ${missing.length} missing`, missing);

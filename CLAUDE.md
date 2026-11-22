@@ -42,6 +42,6 @@ Failures are handled by pausing the queue rather than skipping rows. A refused w
 
 **Tests** sit beside the code as `*.test.ts`. The pure cores (reducer, outbox, engine, QR parsing, i18n) are the ones with real coverage; screens are typechecked and bundled, not exercised on a device.
 
-**i18n.** Catalogs are in `src/i18n/locales/` (en, fi, de, es). Shared terms come from the server `.po` files via `npm run i18n:seed`. Server-provided signal texts are not translated here yet.
+**i18n.** Catalogs are in `src/i18n/locales/` (en, fi, de, es): `<lang>.app.json` for the app's strings, which every language must have in full, and `<lang>.terms.json` for the shared terms that `npm run i18n:seed` rewrites from the server `.po` files. The language is the `language` setting, chosen in Settings. Server-provided signal texts are not translated here yet.
 
 The server code is in a sibling checkout, `../ultiorganizer`, and is not part of this repo. Changes that need server support are made there first, not worked around here; list anything still waiting for the server under Status in README.md.

@@ -67,9 +67,12 @@ export function Button({
   hint,
   size = 'min',
   role = 'button',
+  icon,
 }: {
   label: string;
   onPress: () => void;
+  /** Decorative, shown before the label; the label stays the accessible name. */
+  icon?: ReactNode;
   kind?: 'primary' | 'secondary';
   disabled?: boolean;
   hint?: string;
@@ -96,6 +99,7 @@ export function Button({
         },
       ]}
     >
+      {icon}
       {/* Fixed-height button: the label follows the system text size, then shrinks to fit. */}
       <Text
         allowFontScaling
@@ -104,6 +108,7 @@ export function Button({
         adjustsFontSizeToFit
         minimumFontScale={0.5}
         style={{
+          flexShrink: 1,
           fontFamily: FONTS.textBold,
           fontSize: SIZE.md,
           color: primary ? palette.surface : palette.ink,
@@ -162,6 +167,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: 12,
     paddingHorizontal: SPACE.lg,
+    flexDirection: 'row',
+    gap: SPACE.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

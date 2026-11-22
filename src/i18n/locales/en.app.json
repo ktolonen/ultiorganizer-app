@@ -77,6 +77,8 @@
   "settings.theme.system": "System",
   "settings.theme.light": "Light",
   "settings.theme.dark": "Dark",
+  "settings.language": "Language",
+  "settings.language.system": "Device language",
   "settings.autoPoint": "Start of point timer",
   "settings.autoPoint.hint": "Start the Start of point timer automatically after each goal.",
   "settings.scorekeeper.hint": "Filled in for games that have no scorekeeper yet. Change it per game on the Sheet tab.",
