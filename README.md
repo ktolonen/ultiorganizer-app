@@ -50,6 +50,8 @@ The app is in English. Finnish, German and Spanish cover the shared game terms (
 
 ## Status
 
+Pasting the setup link on the pairing screen needs the server's copyable setup link on the Scorekeeping app page (Ultiorganizer branch `scorekeepingapp-copy-setup-link`, not merged yet). Until then, paste the address and the token.
+
 Version 0.1.0 is the first release, and everything above is in it. Still to come: iOS builds, a landscape layout, a screen reader pass with VoiceOver and TalkBack, full Finnish, German and Spanish translations, and store listings.
 
 ## Documentation

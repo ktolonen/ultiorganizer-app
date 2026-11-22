@@ -35,16 +35,18 @@ export default function Pair() {
   // A setup link copied from the server page fills in the address and the token.
   const onLink = (text: string) => {
     setLink(text);
-    if (!text.trim()) return setError(null);
     const parsed = parseSetupQr(text, QR_OPTIONS);
-    if (!parsed.ok) {
-      return setError(
-        t(parsed.error === 'insecure_root' ? 'scan.error.insecure_root' : 'pair.linkInvalid'),
-      );
-    }
+    if (!parsed.ok) return;
     setRoot(parsed.root);
     setToken(parsed.token);
     setError(null);
+  };
+
+  const onLinkBlur = () => {
+    if (!link.trim()) return;
+    const parsed = parseSetupQr(link, QR_OPTIONS);
+    if (parsed.ok) return;
+    setError(t(parsed.error === 'insecure_root' ? 'scan.error.insecure_root' : 'pair.linkInvalid'));
   };
 
   const submit = async () => {
@@ -75,6 +77,7 @@ export default function Pair() {
             style={input}
             value={link}
             onChangeText={onLink}
+            onBlur={onLinkBlur}
             placeholder={t('pair.linkHint')}
             placeholderTextColor={palette.muted}
             autoCapitalize="none"
