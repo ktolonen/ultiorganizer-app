@@ -93,7 +93,8 @@ export function useTimekeeper(
 ): TimekeeperApi {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<TimekeeperSession>(newSession());
-  const [templateId, setTemplateId] = useState<number>(templates.defaultTemplateId);
+  // null: no choice yet, so the template set's default is used.
+  const [templateId, setTemplateId] = useState<number | null>(null);
   const [overridesAll, setOverridesAll] = useState<OverridesByTemplate>({});
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [soundOn, setSoundOn] = useState(true);
@@ -139,7 +140,7 @@ export function useTimekeeper(
       if (!live) return;
       sessionRef.current = stored.session;
       setSession(stored.session);
-      if (stored.templateId !== null) setTemplateId(stored.templateId);
+      setTemplateId(stored.templateId);
       setOverridesAll(stored.overrides);
       if (stored.session.timer) {
         lastElapsed.current = timerElapsed(stored.session.timer, Date.now());
@@ -273,6 +274,7 @@ export function useTimekeeper(
     selectTemplate: (id) => {
       setTemplateId(id);
       void persist(sessionRef.current, id);
+      void getRepo().then((repo) => repo.rememberTemplate(id));
     },
     setOverrides: (o) => {
       const all = { ...overridesAll, [String(template.id)]: o };

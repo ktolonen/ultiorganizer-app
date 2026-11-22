@@ -25,7 +25,7 @@ A phone app for the person at the sideline of an ultimate game. It keeps the WFD
 - **Get warning and final signals** as a colour change, a beep and a vibration, also when the phone is locked or the app is in the background.
 - **Let goals start the clock**: a recorded goal starts the start-of-point timer automatically, unless you turn that off.
 - **See halftime and time cap** coming as notices on the screen, and record a cap to the scoresheet with one tap.
-- **Use the event's own limits**: the app picks up the tournament's Timekeeper templates, falls back to the WFDF defaults, and lets you choose another template.
+- **Use the event's own limits**: the app picks up the tournament's Timekeeper templates, falls back to the WFDF defaults, and lets you choose another template for each game.
 - **Use it alone**: _Keep time only_ runs the timers with no game and no server.
 
 ### Keep going without a connection

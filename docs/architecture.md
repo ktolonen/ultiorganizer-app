@@ -92,7 +92,7 @@ Local games belong to a reserved server row (id 0, root `local:`). Their entry c
 - JavaScript timers stop in the background on iOS, so every pending signal is also scheduled as a local notification with sound when the app goes to the background, and cancelled when it returns.
 - The beeps are generated WAV square waves (`wav.ts`), with no audio files: one 880 Hz beep for a warning, two 1320 Hz beeps for the final signal.
 - Templates come from the server's `GET timekeeper/templates` (with `Accept-Language` for the signal texts), then a cached copy, then the bundled WFDF defaults in `templates.ts`.
-- Clocks are scoped: one per game and one for Timekeeper-only mode. The template choice and local edits are per device.
+- Clocks are scoped: one per game and one for Timekeeper-only mode. Each scope stores its template choice; a scope without one starts on the template picked last. Local edits to templates are per device.
 
 ## Persistence
 

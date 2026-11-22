@@ -70,6 +70,9 @@ export const MIGRATIONS: readonly string[] = [
   `INSERT INTO servers (id, root, label, created_at) VALUES (0, 'local:', 'This phone', 0);`,
   // The entry context's ETag, so a refresh of saved data can ask If-None-Match.
   `ALTER TABLE cached_contexts ADD COLUMN etag TEXT;`,
+  // The Timekeeper template each clock uses. NULL falls back to the last one picked
+  // (timekeeper_prefs.template_id), which new clocks start with.
+  `ALTER TABLE timekeeper_sessions ADD COLUMN template_id INTEGER;`,
 ];
 
 /** The minimal database surface the store needs; `expo-sqlite` and test fakes both fit. */

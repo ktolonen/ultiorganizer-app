@@ -430,16 +430,17 @@ export function createRepo(db: Db) {
 
     /**
      * The timekeeper session of one scope: `STANDALONE_SCOPE` for Timekeeper-only mode,
-     * or `gameScope(serverId, gameId)` so each game has its own clock and marks. The
-     * template choice and local edits are per device, shared by all scopes.
+     * or `gameScope(serverId, gameId)` so each game has its own clock and marks. Each
+     * scope keeps its own template; one that has none yet gets the last template
+     * picked on the device. Local edits to templates are per device, shared by all scopes.
      */
     async loadTimekeeper(scope: string): Promise<{
       session: TimekeeperSession;
       templateId: number | null;
       overrides: OverridesByTemplate;
     }> {
-      const s = await db.getFirstAsync<{ session_json: string }>(
-        'SELECT session_json FROM timekeeper_sessions WHERE scope = ?',
+      const s = await db.getFirstAsync<{ session_json: string; template_id: number | null }>(
+        'SELECT session_json, template_id FROM timekeeper_sessions WHERE scope = ?',
         scope,
       );
       const p = await db.getFirstAsync<{ template_id: number | null; overrides_json: string }>(
@@ -447,7 +448,7 @@ export function createRepo(db: Db) {
       );
       return {
         session: parseJson(s?.session_json, sessionSchema) ?? newSession(),
-        templateId: p?.template_id ?? null,
+        templateId: s?.template_id ?? p?.template_id ?? null,
         overrides: parseJson(p?.overrides_json, overridesSchema) ?? {},
       };
     },
@@ -460,16 +461,25 @@ export function createRepo(db: Db) {
       overrides: OverridesByTemplate,
     ): Promise<void> {
       await db.runAsync(
-        `INSERT INTO timekeeper_sessions (scope, session_json) VALUES (?, ?)
-         ON CONFLICT(scope) DO UPDATE SET session_json = excluded.session_json`,
+        `INSERT INTO timekeeper_sessions (scope, session_json, template_id) VALUES (?, ?, ?)
+         ON CONFLICT(scope) DO UPDATE SET session_json = excluded.session_json, template_id = excluded.template_id`,
         scope,
         JSON.stringify(session),
+        templateId,
       );
       await db.runAsync(
-        `INSERT INTO timekeeper_prefs (id, template_id, overrides_json) VALUES (1, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET template_id = excluded.template_id, overrides_json = excluded.overrides_json`,
-        templateId,
+        `INSERT INTO timekeeper_prefs (id, overrides_json) VALUES (1, ?)
+         ON CONFLICT(id) DO UPDATE SET overrides_json = excluded.overrides_json`,
         JSON.stringify(overrides),
+      );
+    },
+
+    /** The template a scope without its own choice starts with: the last one picked. */
+    async rememberTemplate(templateId: number): Promise<void> {
+      await db.runAsync(
+        `INSERT INTO timekeeper_prefs (id, template_id) VALUES (1, ?)
+         ON CONFLICT(id) DO UPDATE SET template_id = excluded.template_id`,
+        templateId,
       );
     },
 

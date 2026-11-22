@@ -226,12 +226,25 @@ describe('timekeeper and settings', () => {
     expect((await repo.loadTimekeeper(STANDALONE_SCOPE)).session).toEqual(newSession());
     expect((await repo.loadTimekeeper(gameScope(1, 10))).session).toEqual(STARTED);
   });
-  it('shares the template choice and local edits across scopes', async () => {
+  it('keeps a template per scope and shares local edits', async () => {
     const { repo } = await fresh();
     await repo.saveTimekeeper(gameScope(1, 10), STARTED, 7, { '7': { caps: { time_cap: 80 } } });
+    await repo.saveTimekeeper(gameScope(1, 11), STARTED, 8, { '7': { caps: { time_cap: 80 } } });
+    expect((await repo.loadTimekeeper(gameScope(1, 10))).templateId).toBe(7);
+    expect((await repo.loadTimekeeper(gameScope(1, 11))).templateId).toBe(8);
     const other = await repo.loadTimekeeper(STANDALONE_SCOPE);
-    expect(other.templateId).toBe(7);
+    expect(other.templateId).toBeNull();
     expect(other.overrides).toEqual({ '7': { caps: { time_cap: 80 } } });
+  });
+  it('starts a scope without its own template on the last one picked', async () => {
+    const { repo } = await fresh();
+    await repo.saveTimekeeper(gameScope(1, 10), STARTED, 7, {});
+    await repo.rememberTemplate(9);
+    expect((await repo.loadTimekeeper(gameScope(1, 10))).templateId).toBe(7);
+    expect((await repo.loadTimekeeper(gameScope(1, 12))).templateId).toBe(9);
+    await repo.saveTimekeeper(gameScope(1, 12), STARTED, 9, {});
+    await repo.rememberTemplate(4);
+    expect((await repo.loadTimekeeper(gameScope(1, 12))).templateId).toBe(9);
   });
   it('deleting or purging a game deletes its clock', async () => {
     const { repo } = await fresh();
