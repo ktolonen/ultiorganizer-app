@@ -43,6 +43,13 @@ describe('parseSetupQr', () => {
       token: 'tok_123',
     });
   });
+  it('accepts a pasted setup link with surrounding whitespace', () => {
+    expect(parseSetupQr(`  ${qr('https://example.org/uo', 'tok')}\n`)).toEqual({
+      ok: true,
+      root: 'https://example.org/uo',
+      token: 'tok',
+    });
+  });
   it('refuses an insecure root', () => {
     expect(parseSetupQr(qr('http://example.org', 'x'))).toEqual({
       ok: false,
