@@ -36,8 +36,9 @@ function Flag({ lang }: { lang: Language }) {
       source={FLAGS[lang].source}
       accessible={false}
       style={{
+        // Both sides explicit: Android sizes an image by its file when only one is given.
         height: 18,
-        aspectRatio: FLAGS[lang].aspect,
+        width: Math.round(18 * FLAGS[lang].aspect),
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: palette.line,
       }}
