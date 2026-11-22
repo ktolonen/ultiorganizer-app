@@ -40,7 +40,7 @@
   "scan.error.bad_link_token": "The scorekeeping link in this QR code is not valid.",
   "scan.error.missing_token": "This setup QR code has no token.",
   "games.title": "Games",
-  "games.opensOn": "Opens on {{date}}",
+  "games.opensOn": "Games open for scorekeeping only on their game day. These games open on {{date}}.",
   "games.empty": "No games to keep right now.",
   "games.notStarted": "Not started",
   "games.ongoing": "Ongoing",
