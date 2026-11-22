@@ -34,7 +34,7 @@ The app works against older servers too. It probes each optional route once per 
 
 ## Pairing and links
 
-A setup QR holds `ultiorganizer-app://pair?root=<root>&token=<token>`; a scorekeeping QR holds `<root>/scorekeeper/?t=<32 hex>`. Both are read only by the in-app scanner (`src/pairing/qr.ts`). The app does not register the `ultiorganizer-app://` scheme, because Android does not verify custom schemes, and another app claiming it could receive the token from a system camera scan. A scanned root must match a paired server. Release builds accept only `https`; development builds also accept `http` to private-network addresses and the Android emulator.
+A setup QR holds `ultiorganizer-app://pair?root=<root>&token=<token>`; a scorekeeping QR holds `<root>/scorekeeper/?t=<32 hex>`. Both are read only by the in-app scanner (`src/pairing/qr.ts`); the setup link can also be pasted on the pairing screen, for a phone that shows the server page and so cannot scan it. The app does not register the `ultiorganizer-app://` scheme, because Android does not verify custom schemes, and another app claiming it could receive the token from a system camera scan. A scanned root must match a paired server. Release builds accept only `https`; development builds also accept `http` to private-network addresses and the Android emulator.
 
 ## Single-game data flow
 

@@ -13,7 +13,7 @@ The app needs an app token from the installation once. Get its setup QR code fro
 - **Scorekeeping app** in the Ultiorganizer menu, for a logged-in user. It appears while a current event admits you. The token there is your own: games you keep are recorded under your name, and only this kind of token can save a game note. _Replace token_ cuts off a lost phone.
 - **API tokens** in the administration pages, for tokens an administrator hands out.
 
-In the app, tap _Pair a server_ and scan the setup QR, or paste the server address and the token. Anyone holding the QR code or the token can keep score with any scorekeeping link of that installation, so keep it private. Several installations can be paired. _Forget_ in Settings removes a server and deletes its games from the phone.
+In the app, tap _Pair a server_ and scan the setup QR. When the Ultiorganizer page is open on the same phone, copy the setup link under the QR code and paste it into _Setup link_ instead. You can also enter the server address and the token. Anyone holding the QR code, the setup link or the token can keep score with any scorekeeping link of that installation, so keep it private. Several installations can be paired. _Forget_ in Settings removes a server and deletes its games from the phone.
 
 ## Keeping score
 
