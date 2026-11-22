@@ -34,7 +34,13 @@ import {
 } from '../../../store/repo';
 import { getRepo } from '../../../store/sqlite';
 import { isFullySynced, unsentRows } from '../../../sync/outbox';
-import { ActionButtons, ActionTimerBar, formatTime, GameClockPanel } from '../../../timekeeper/ui';
+import {
+  ActionButtons,
+  ActionTimerBar,
+  formatTime,
+  GameClockPanel,
+  TemplatePicker,
+} from '../../../timekeeper/ui';
 import { useTemplates } from '../../../timekeeper/useTemplates';
 import { useTimekeeper } from '../../../timekeeper/useTimekeeper';
 import { Button, Divider, layout, Screen, Txt } from '../../../ui/components';
@@ -319,6 +325,7 @@ export default function GameScreen() {
                 onPress={() => setAsking('spirit')}
               />
             )}
+            <TemplatePicker tk={tk} />
           </ScrollView>
         </View>
       )}

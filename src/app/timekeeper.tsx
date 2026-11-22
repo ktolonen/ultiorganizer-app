@@ -1,12 +1,12 @@
 import { useRouter } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { ActionButtons, ActionTimerBar, GameClockPanel } from '../timekeeper/ui';
+import { ActionButtons, ActionTimerBar, GameClockPanel, TemplatePicker } from '../timekeeper/ui';
 import { useTemplates } from '../timekeeper/useTemplates';
 import { useTimekeeper } from '../timekeeper/useTimekeeper';
 import { Button, layout, Screen, Txt } from '../ui/components';
 
-/** Timekeeper only: the timer screen with no game and no server. Cached server templates are used when there are any. */
+/** Timekeeper only: the timer screen with no game and no server. Cached server templates are used when there are any, and can be picked when there are several. */
 export default function TimekeeperScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -29,6 +29,7 @@ export default function TimekeeperScreen() {
         <ActionTimerBar tk={tk} />
         <ActionButtons tk={tk} />
         <GameClockPanel tk={tk} />
+        <TemplatePicker tk={tk} />
         <Txt variant="small" muted>
           {t('timekeeper.notifications')}
         </Txt>

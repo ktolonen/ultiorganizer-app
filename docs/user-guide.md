@@ -50,7 +50,7 @@ _Keep time only_ on Home opens the timer without a game or a server. In a game, 
 - Actions: Start of game, Start of point, Timeout, Halftime, Call or discussion, and Disc retrieval. Each runs a timer with warning and final signals: a colour change, a beep and a vibration (one for a warning, two for the final signal).
 - A recorded goal starts the Start of point timer automatically. Turn this off in Settings.
 - The halftime and time cap times show as notices; _Record cap_ saves a cap to the scoresheet.
-- The time limits come from the server's Timekeeper templates when the server has them, and otherwise from the WFDF defaults built into the app. Pick another template under _Time limits_.
+- The time limits come from the server's Timekeeper templates when the server has them, and otherwise from the WFDF defaults built into the app. When there are several, the _Time limits_ line below the Timekeeper (at the bottom of the Live tab in a game) shows the current one; tap _Change_ to pick another. The choice is kept on the phone for all games. The new limits apply from the next action, and a game clock that has already started keeps its halftime and time caps.
 - The screen stays on while a timer runs. When the app is in the background, the signals still arrive as notifications with sound, so allow notifications when the app asks.
 - The timers are based on the phone's clock, so they stay right after the app is closed and reopened. Changing the phone's time during a game moves them.
 

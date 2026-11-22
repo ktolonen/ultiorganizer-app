@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { signalText } from '../i18n';
 import { Button, Txt } from '../ui/components';
@@ -264,6 +265,68 @@ export function GameClockPanel({ tk, compact }: { tk: TimekeeperApi; compact?: b
   );
 }
 
+/**
+ * The template choice: a text line with the current time limits, opening a sheet of the
+ * available templates. Hidden when there is only one. The choice is per phone. A running
+ * timer keeps its scenario and a started clock its caps; the new limits apply from the next action.
+ */
+export function TemplatePicker({ tk }: { tk: TimekeeperApi }) {
+  const { t } = useTranslation();
+  const { palette } = useTheme();
+  const [open, setOpen] = useState(false);
+  const options = tk.templates.templates;
+  if (options.length < 2) return null;
+  const current = t('timekeeper.templateCurrent', { name: tk.template.name });
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${current}. ${t('timekeeper.templateChange')}`}
+        onPress={() => setOpen(true)}
+        style={styles.templateLine}
+      >
+        <Txt variant="small" muted style={{ flexShrink: 1 }}>
+          {current}
+        </Txt>
+        <Txt variant="small" style={{ textDecorationLine: 'underline' }}>
+          {t('timekeeper.templateChange')}
+        </Txt>
+      </Pressable>
+      <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
+        <View style={styles.backdrop}>
+          <View
+            style={[styles.sheet, { backgroundColor: palette.surface, borderColor: palette.ink }]}
+          >
+            <Txt variant="heading" accessibilityRole="header">
+              {t('timekeeper.template')}
+            </Txt>
+            <ScrollView contentContainerStyle={{ gap: SPACE.sm }}>
+              {options.map((o) => {
+                const selected = o.id === tk.template.id;
+                return (
+                  <Button
+                    key={o.id}
+                    label={selected ? `${o.name} ✓` : o.name}
+                    kind={selected ? 'primary' : 'secondary'}
+                    onPress={() => {
+                      tk.selectTemplate(o.id);
+                      setOpen(false);
+                    }}
+                  />
+                );
+              })}
+            </ScrollView>
+            <Txt variant="small" muted>
+              {t('timekeeper.templateHint')}
+            </Txt>
+            <Button label={t('common.cancel')} kind="secondary" onPress={() => setOpen(false)} />
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   bar: { borderWidth: 2, borderRadius: 12, padding: SPACE.lg, alignItems: 'center', gap: 2 },
   barCompact: { paddingVertical: SPACE.sm, paddingHorizontal: SPACE.md, gap: 0 },
@@ -276,4 +339,19 @@ const styles = StyleSheet.create({
   clockRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
   clockButtons: { flexDirection: 'row', gap: SPACE.sm },
   markRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
+  templateLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.sm,
+    minHeight: TARGET.min,
+  },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: {
+    maxHeight: '85%',
+    borderTopWidth: 2,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: SPACE.lg,
+    gap: SPACE.md,
+  },
 });
