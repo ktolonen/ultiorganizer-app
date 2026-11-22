@@ -33,7 +33,7 @@ describe('translation', () => {
   it('uses the seeded word, and falls back to English for the rest', () => {
     initI18n('fi');
     expect(i18n.t('term.goal')).toBe('Maali');
-    expect(i18n.t('home.scan')).toBe('Scan scorekeeping QR');
+    expect(i18n.t('home.scan')).toBe('Scan QR for scorekeeping');
     expect(i18n.t('home.unsent', { count: 3 })).toBe('3 unsent');
   });
   it('shows custom signal texts as sent and known ones translated when possible', () => {

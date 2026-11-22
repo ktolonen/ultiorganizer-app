@@ -1,7 +1,7 @@
 {
   "app.name": "Ultiorganizer Scorekeeper",
   "home.title": "Ultiorganizer Scorekeeper",
-  "home.scan": "Scan scorekeeping QR",
+  "home.scan": "Scan QR for scorekeeping",
   "home.timekeeper": "Timekeeper only",
   "home.pair": "Pair a server",
   "home.servers": "Paired servers",

@@ -17,7 +17,7 @@ In the app, tap _Pair a server_ and scan the setup QR, or paste the server addre
 
 ## Keeping score
 
-1. Tap _Scan scorekeeping QR_ and scan the game's or the field's scorekeeping QR code, the same code Scorekeeper uses in the browser.
+1. Tap _Scan QR for scorekeeping_ and scan the game's or the field's scorekeeping QR code, the same code Scorekeeper uses in the browser.
 2. A game link opens the game. A field link lists its games for the day; outside the game day it shows when it opens. A field link stays on Home under _Field links_, so it reopens without the camera.
 3. The game has four tabs:
    - **Rosters**: tap players to put them on the game roster. Team captain and Spirit captain show as `C` and `SC`.
