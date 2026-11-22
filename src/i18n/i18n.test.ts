@@ -49,6 +49,10 @@ describe('catalogs', () => {
   it.each(Object.keys(apps))('translates every app string into %s', (lng) => {
     expect(Object.keys(apps[lng]).sort()).toEqual(Object.keys(en).sort());
   });
+  it.each(Object.keys(apps))('keeps the language-neutral abbreviations in %s', (lng) => {
+    // docs/terminology.md in the server: narrow-table abbreviations are never translated.
+    expect(apps[lng]['game.timeouts']).toBe('TO');
+  });
   it.each(Object.keys(apps))('keeps the placeholders of every %s string', (lng) => {
     for (const [key, text] of Object.entries(en)) {
       expect([key, placeholders(apps[lng][key])]).toEqual([key, placeholders(text)]);
@@ -64,9 +68,13 @@ describe('translation', () => {
     expect(i18n.t('settings.forget.unsent', { count: 1 })).toMatch(/^1 merkintä /);
     expect(i18n.t('settings.forget.unsent', { count: 3 })).toMatch(/^3 merkintää /);
   });
+  it('uses the server alias for a term it has not translated', () => {
+    initI18n('fi');
+    expect(i18n.t('term.teamCaptain')).toBe('Kapteeni');
+  });
   it('falls back to English for a term the server has not translated', () => {
     initI18n('fi');
-    expect(i18n.t('term.teamCaptain')).toBe('Team captain');
+    expect(i18n.t('signal.Offence warning')).toBe('Offence warning');
   });
   it('switches language from the Settings choice', () => {
     setLanguage('de');

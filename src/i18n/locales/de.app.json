@@ -62,7 +62,7 @@
   "timekeeper.next": "Als Nächstes: {{text}}",
   "timekeeper.clockMissed": "Die Spieluhr läuft nicht",
   "timekeeper.capHalf": "Halbzeit-Zeitgrenze erreicht",
-  "timekeeper.capTime": "Zeitgrenze erreicht",
+  "timekeeper.capTime": "Zeitobergrenze erreicht",
   "timekeeper.dismiss": "Ausblenden",
   "timekeeper.sound": "Ton",
   "timekeeper.template": "Zeitlimits",

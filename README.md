@@ -50,7 +50,7 @@ The app is in English, Finnish, German and Spanish. It follows the phone's langu
 
 ## Status
 
-The server's translations do not have _Team captain_ or the Timekeeper's built-in signal texts (_Offence warning_, _Start of play_…) yet, so those stay in English until the server's `.po` files have them and `npm run i18n:seed` is run again. Signal texts from the server's own templates are translated by the server.
+The server's translations do not have the Timekeeper's built-in signal texts (_Offence warning_, _Start of play_…) yet, so those stay in English until the server's `.po` files have them and `npm run i18n:seed` is run again. Signal texts from the server's own templates are translated by the server.
 
 Pasting the setup link on the pairing screen needs the server's copyable setup link on the Scorekeeping app page (ktolonen/ultiorganizer#152, not merged yet). Until then, paste the address and the token.
 

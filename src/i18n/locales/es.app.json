@@ -104,7 +104,7 @@
   "sync.serverError": "Error del servidor, {{count}} en cola",
   "sync.attention": "Requiere atención",
   "game.score": "{{team}}, {{points}} puntos, quedan {{timeouts}} tiempos fuera",
-  "game.timeouts": "TF",
+  "game.timeouts": "TO",
   "game.goal": "Gol",
   "game.timeout": "Tiempo fuera",
   "game.spirit": "Espíritu",

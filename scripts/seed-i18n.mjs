@@ -7,7 +7,9 @@ import { join } from 'node:path';
 const root = process.argv[2] ?? join(import.meta.dirname, '../../ultiorganizer');
 const catalogs = { fi: 'fi_FI.utf8', de: 'de_DE.utf8', es: 'es_ES.utf8' };
 
-// key in the app catalog -> msgid in the server catalog
+// key in the app catalog -> msgid in the server catalog. A list gives the preferred
+// term first, then the aliases of docs/terminology.md to use while the server has no
+// translation for it.
 const TERMS = {
   'term.goal': 'Goal',
   'term.assist': 'Assist',
@@ -18,7 +20,7 @@ const TERMS = {
   'term.halftimeCap': 'Halftime cap',
   'term.timeCap': 'Time cap',
   'term.startingOffence': 'Starting offence',
-  'term.teamCaptain': 'Team captain',
+  'term.teamCaptain': ['Team captain', 'Captain'],
   'term.spiritCaptain': 'Spirit captain',
   'term.scorekeeper': 'Scorekeeper',
   'term.roster': 'Roster',
@@ -82,10 +84,11 @@ for (const [lng, dir] of Object.entries(catalogs)) {
   const po = parsePo(readFileSync(join(root, 'locale', dir, 'LC_MESSAGES/messages.po'), 'utf8'));
   const out = {};
   const missing = [];
-  for (const [key, msgid] of Object.entries(TERMS)) {
-    const msgstr = po.get(msgid);
+  for (const [key, ids] of Object.entries(TERMS)) {
+    const msgids = [ids].flat();
+    const msgstr = msgids.map((id) => po.get(id)).find(Boolean);
     if (msgstr) out[key] = msgstr;
-    else missing.push(msgid);
+    else missing.push(msgids[0]);
   }
   writeFileSync(
     join(import.meta.dirname, `../src/i18n/locales/${lng}.terms.json`),
@@ -96,7 +99,10 @@ for (const [lng, dir] of Object.entries(catalogs)) {
 
 // English is the msgid itself.
 const en = Object.fromEntries(
-  Object.entries(TERMS).map(([k, v]) => [k, v === 'unknown' ? 'Unknown' : v]),
+  Object.entries(TERMS).map(([k, ids]) => {
+    const v = [ids].flat()[0];
+    return [k, v === 'unknown' ? 'Unknown' : v];
+  }),
 );
 writeFileSync(
   join(import.meta.dirname, '../src/i18n/locales/en.terms.json'),

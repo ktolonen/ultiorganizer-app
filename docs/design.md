@@ -40,7 +40,7 @@ Both fonts are bundled with the app.
 
 ## Wording
 
-Terms follow the server's [terminology reference](https://github.com/ktolonen/ultiorganizer/blob/master/docs/terminology.md), and the shared terms in Finnish, German and Spanish are seeded from the server's translations (`npm run i18n:seed`), so the app and the website use the same words. The rest of the Finnish, German and Spanish strings are the app's own and reuse the server's wording where it has one. In the language picker each language is named in itself (Suomi, Deutsch…), next to the server's flag, so a user who chose the wrong one can find the way back. `C`, `SC` and `TO` are the approved abbreviations for narrow layouts. Server error messages are English, so the app maps each `error.code` to its own sentence and keeps the server's text only as a detail.
+Terms follow the server's [terminology reference](https://github.com/ktolonen/ultiorganizer/blob/master/docs/terminology.md), and the shared terms in Finnish, German and Spanish are seeded from the server's translations (`npm run i18n:seed`), so the app and the website use the same words. The rest of the Finnish, German and Spanish strings are the app's own and reuse the server's wording where it has one. In the language picker each language is named in itself (Suomi, Deutsch…), next to the server's flag, so a user who chose the wrong one can find the way back. `C`, `SC` and `TO` are the approved abbreviations for narrow layouts. They are the same in every language, and the Rosters tab explains `C` and `SC` in a localized legend; screen readers say the full term. Server error messages are English, so the app maps each `error.code` to its own sentence and keeps the server's text only as a detail.
 
 ## Accessibility
 

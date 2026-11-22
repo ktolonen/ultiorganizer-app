@@ -48,9 +48,9 @@ A change that needs new server support is made in the server repository first. T
 
 ## Translations
 
-Catalogs are in `src/i18n/locales/`, two per language: `<lang>.app.json` holds the app's own strings and `<lang>.terms.json` the shared terms. `npm run i18n:seed` rewrites the `fi`, `de` and `es` terms files from the server's `.po` files, read from a sibling checkout at `../ultiorganizer` (or a path given as an argument), and never touches the app files. Fix a wrong term in the server's `.po`, not here. A term the server has not translated falls back to English.
+Catalogs are in `src/i18n/locales/`, two per language: `<lang>.app.json` holds the app's own strings and `<lang>.terms.json` the shared terms. `npm run i18n:seed` rewrites the `fi`, `de` and `es` terms files from the server's `.po` files, read from a sibling checkout at `../ultiorganizer` (or a path given as an argument), and never touches the app files. Fix a wrong term in the server's `.po`, not here. When the server has no translation for a preferred term, the seed script can take one of its aliases from the server's `docs/terminology.md` (_Team captain_ uses _Captain_); otherwise the term falls back to English.
 
-A new app string goes into all four `*.app.json` files. Tests check that every language has the same keys as English, with the same `{{placeholders}}`, and that no app key overlaps a term key. Within a language, a sentence that mentions a term uses the seeded word for it, and plurals use i18next's `_one`/`_other` suffixes.
+A new app string goes into all four `*.app.json` files. Tests check that every language has the same keys as English, with the same `{{placeholders}}`, and that no app key overlaps a term key. Within a language, a sentence that mentions a term uses the seeded word for it, the narrow-table abbreviations (`TO`, `C`, `SC`) stay untranslated in every language, and plurals use i18next's `_one`/`_other` suffixes.
 
 The language choice is the `language` setting (`system` or a language code); `setLanguage` in `src/i18n/index.ts` applies it at startup and from Settings. The flags in `assets/images/flags/` are copied from the server's `images/flags/medium/`.
 

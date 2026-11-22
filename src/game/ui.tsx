@@ -104,9 +104,12 @@ function Chip({
   selected,
   big,
   color,
+  a11yLabel,
 }: {
   label: string;
   onPress: () => void;
+  /** Spoken instead of the label, for an abbreviation such as C or SC. */
+  a11yLabel?: string;
   selected?: boolean;
   big?: boolean;
   color?: string;
@@ -115,6 +118,7 @@ function Chip({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
       accessibilityState={{ selected: !!selected }}
       onPress={onPress}
       style={[
@@ -459,6 +463,12 @@ export function RosterEditor({
         </Txt>
       )}
       {draft && <Button label={t('game.rosterSave')} onPress={() => onSave(current)} />}
+      {current.length > 0 && (
+        // The terminology keeps C and SC untranslated and explains them in a localized legend.
+        <Txt variant="small" muted>
+          C = {t('term.teamCaptain')} · SC = {t('term.spiritCaptain')}
+        </Txt>
+      )}
       {state.eligible[side].map((p) => {
         const entry = on(p.player_id);
         const blocked = isBlocked(p);
@@ -486,11 +496,13 @@ export function RosterEditor({
                 {/* Approved narrow-table abbreviations from the server's docs/terminology.md; not translated. */}
                 <Chip
                   label="C"
+                  a11yLabel={t('term.teamCaptain')}
                   selected={entry.captain}
                   onPress={() => flag(p.player_id, 'captain')}
                 />
                 <Chip
                   label="SC"
+                  a11yLabel={t('term.spiritCaptain')}
                   selected={entry.spirit_captain}
                   onPress={() => flag(p.player_id, 'spirit_captain')}
                 />
