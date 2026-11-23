@@ -244,6 +244,18 @@ export const discoverySchema = z.object({
     }),
   ),
   available_from: z.string().nullable(),
+  // What a link outside its day covers, so it can be named before it opens. Older
+  // servers leave it out.
+  upcoming: z
+    .object({
+      time: z.string().nullable(),
+      field: z.string().nullable(),
+      location: z.string().nullable(),
+      home: z.string().nullable(),
+      away: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 export type Discovery = z.infer<typeof discoverySchema>;
 export type DiscoveredGame = Discovery['games'][number];

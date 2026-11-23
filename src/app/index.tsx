@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { isLocalGame } from '../game/local';
-import { formatDay, formatDayTime } from '../services/links';
+import { formatDayTime } from '../services/links';
 import { usePendingLink } from '../services/pending';
 import { deleteLinkToken, deleteSavedLinkToken, getSavedLinkToken } from '../store/secure';
 import type { LinkRow, Repo, ServerRow } from '../store/repo';
@@ -128,7 +128,7 @@ export default function Home() {
               <View key={l.id} style={[styles.card, { borderColor: palette.line }]}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={[linkTitle(l), formatDay(l.day, i18n.language)]
+                  accessibilityLabel={[linkTitle(l), formatDayTime(l.day, i18n.language)]
                     .filter(Boolean)
                     .join(', ')}
                   accessibilityHint={t('home.linkHint')}
@@ -137,7 +137,7 @@ export default function Home() {
                 >
                   <Txt variant="heading">{linkTitle(l)}</Txt>
                   <Txt variant="small" muted>
-                    {[formatDay(l.day, i18n.language), serverLabel(l.serverId)]
+                    {[formatDayTime(l.day, i18n.language), serverLabel(l.serverId)]
                       .filter(Boolean)
                       .join(' · ')}
                   </Txt>

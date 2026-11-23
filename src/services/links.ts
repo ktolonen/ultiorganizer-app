@@ -10,19 +10,39 @@ export function shouldRemember(data: Discovery): boolean {
   return data.games.length > 1 || (data.games.length === 0 && !!data.available_from);
 }
 
-/** Card text for a link: the fields it covers and the day of its first game. */
+/**
+ * Card text for a link. A game link is named by its teams and field, a field link by
+ * its fields; `day` is the first game's time (or the day it opens when the server
+ * gives no time), so links for the same field on different days stay apart.
+ */
 export function linkSummary(data: Discovery): { label: string; day: string | null } {
-  const fields = [...new Set(data.games.map((g) => g.field).filter((f): f is string => !!f))];
-  const days = data.games
-    .map((g) => dayOf(g.time))
-    .filter((d): d is string => d !== null)
+  const up = data.upcoming;
+  const one = data.games.length === 1 ? data.games[0] : null;
+  const teams = one
+    ? [one.home.name, one.away.name]
+    : up && (up.home || up.away)
+      ? [up.home, up.away]
+      : null;
+  const fields = data.games.length
+    ? data.games.map((g) => g.field)
+    : [up?.field || (teams ? null : up?.location)];
+  const label = [
+    teams ? teams.map((n) => n || '?').join(' – ') : '',
+    [...new Set(fields.filter((f): f is string => !!f))].join(', '),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const times = [...data.games.map((g) => g.time), up?.time]
+    .filter((t): t is string => dayOf(t) !== null)
     .sort();
-  return { label: fields.join(', '), day: days[0] ?? dayOf(data.available_from) };
+  return { label, day: times[0] ?? dayOf(data.available_from) };
 }
 
 /**
- * Saves the link, or refreshes the saved row when this token is already kept for the
- * server. Tokens are compared in SecureStore, since SQLite never holds them.
+ * Saves a field link or a link scanned before its day, or refreshes the saved row when
+ * this token is already kept for the server, even once it lists a single game, so a
+ * link saved early takes its game's name. Tokens are compared in SecureStore, since
+ * SQLite never holds them. Returns the row id, or null when nothing is kept.
  */
 export async function rememberLink(deps: {
   repo: Repo;
@@ -32,7 +52,7 @@ export async function rememberLink(deps: {
   getToken: (linkId: number) => Promise<string | null>;
   saveToken: (linkId: number, token: string) => Promise<void>;
   now: number;
-}): Promise<number> {
+}): Promise<number | null> {
   const { repo, serverId, linkToken } = deps;
   const summary = { ...linkSummary(deps.data), now: deps.now };
   for (const l of await repo.listLinks(serverId)) {
@@ -41,6 +61,7 @@ export async function rememberLink(deps: {
       return l.id;
     }
   }
+  if (!shouldRemember(deps.data)) return null;
   const id = await repo.insertLink({ serverId, ...summary });
   await deps.saveToken(id, linkToken);
   return id;

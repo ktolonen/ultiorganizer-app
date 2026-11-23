@@ -37,7 +37,15 @@ describe('shouldRemember', () => {
 });
 
 describe('linkSummary', () => {
-  it('names the distinct fields and the earliest day', () => {
+  const upcoming = (o: Partial<NonNullable<Discovery['upcoming']>>) => ({
+    time: null,
+    field: null,
+    location: null,
+    home: null,
+    away: null,
+    ...o,
+  });
+  it('names the distinct fields and the first start time of a field link', () => {
     expect(
       linkSummary(
         list([
@@ -47,9 +55,28 @@ describe('linkSummary', () => {
           game(4, null, null),
         ]),
       ),
-    ).toEqual({ label: 'Field 3, Field 4', day: '2026-11-01' });
+    ).toEqual({ label: 'Field 3, Field 4', day: '2026-11-01 15:00:00' });
   });
-  it('falls back to the opening day', () => {
+  it('names a game link by its teams and field', () => {
+    expect(linkSummary(list([game(1, '2026-11-01 10:00:00', 'F1')]))).toEqual({
+      label: 'A – B · F1',
+      day: '2026-11-01 10:00:00',
+    });
+  });
+  it('names a game link scanned before its day from what the server says it covers', () => {
+    const data: Discovery = {
+      ...list([], '2026-11-07'),
+      upcoming: upcoming({ time: '2026-11-07 12:30:00', field: 'F2', home: 'X', away: null }),
+    };
+    expect(linkSummary(data)).toEqual({ label: 'X – ? · F2', day: '2026-11-07 12:30:00' });
+  });
+  it('names a field link scanned before its day by its field, or its location', () => {
+    const at = (o: Partial<NonNullable<Discovery['upcoming']>>) =>
+      linkSummary({ ...list([], '2026-11-07'), upcoming: upcoming(o) }).label;
+    expect(at({ field: 'F2', location: 'Park' })).toBe('F2');
+    expect(at({ location: 'Park' })).toBe('Park');
+  });
+  it('falls back to the opening day when the server says nothing more', () => {
     expect(linkSummary(list([], '2026-11-07'))).toEqual({ label: '', day: '2026-11-07' });
   });
 });
@@ -105,10 +132,10 @@ describe('rememberLink', () => {
 
   it('saves a new link with its token in secure storage only', async () => {
     const { repo, tokens, deps } = await setup();
-    const id = await rememberLink(deps('a'.repeat(32), data, 5));
+    const id = (await rememberLink(deps('a'.repeat(32), data, 5)))!;
     expect(tokens.get(id)).toBe('a'.repeat(32));
     expect(await repo.listLinks()).toEqual([
-      expect.objectContaining({ id, label: 'F1', day: '2026-11-01', usedAt: 5 }),
+      expect.objectContaining({ id, label: 'F1', day: '2026-11-01 10:00:00', usedAt: 5 }),
     ]);
   });
   it('refreshes the same link instead of adding it twice', async () => {
@@ -119,6 +146,16 @@ describe('rememberLink', () => {
     expect((await repo.listLinks()).map((l) => [l.id, l.usedAt])).toEqual([
       [a, 7],
       [b, 6],
+    ]);
+  });
+  it('renames a link saved before its day once it lists its game, and never adds one', async () => {
+    const { repo, deps } = await setup();
+    const early = await rememberLink(deps('a'.repeat(32), list([], '2026-11-01'), 5));
+    const single = list([game(1, '2026-11-01 10:00:00', 'F1')]);
+    expect(await rememberLink(deps('a'.repeat(32), single, 6))).toBe(early);
+    expect(await rememberLink(deps('b'.repeat(32), single, 7))).toBeNull();
+    expect(await repo.listLinks()).toEqual([
+      expect.objectContaining({ id: early, label: 'A – B · F1', usedAt: 6 }),
     ]);
   });
 });

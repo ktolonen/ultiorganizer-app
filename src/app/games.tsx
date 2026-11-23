@@ -4,13 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { DiscoveredGame, Discovery } from '../api/http';
 import { groupByField } from '../services/games';
-import {
-  formatClock,
-  formatDay,
-  formatDayTime,
-  rememberLink,
-  shouldRemember,
-} from '../services/links';
+import { formatClock, formatDay, formatDayTime, rememberLink } from '../services/links';
 import { usePendingLink } from '../services/pending';
 import { loadGameList, openFromLink } from '../services/session';
 import { getSavedLinkToken, saveSavedLinkToken } from '../store/secure';
@@ -39,8 +33,9 @@ export default function Games() {
       if (res.ok) {
         setData(res.data);
         setCachedAt(res.cachedAt ?? null);
-        // Keep a field link on Home so its games reopen without another scan.
-        if (res.cachedAt === undefined && shouldRemember(res.data)) {
+        // Keep a field link on Home so its games reopen without another scan, and rename
+        // a link saved before its day.
+        if (res.cachedAt === undefined) {
           getRepo()
             .then((repo) =>
               rememberLink({

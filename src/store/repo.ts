@@ -35,9 +35,9 @@ export const CACHE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export type LinkRow = {
   id: number;
   serverId: number;
-  /** Fields the link covers, e.g. `Field 3`; empty when the server gave none. */
+  /** Teams and field of a game link, or the fields of a field link; may be empty. */
   label: string;
-  /** `YYYY-MM-DD` of its first game, or the day it opens; null when unknown. */
+  /** Server time of its first game, or the `YYYY-MM-DD` it opens; null when unknown. */
   day: string | null;
   usedAt: number;
 };

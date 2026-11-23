@@ -18,7 +18,7 @@ In the app, tap _Pair a server_ and scan the setup QR. When the Ultiorganizer pa
 ## Keeping score
 
 1. Tap _Scan QR for scorekeeping_ and scan the game's or the field's scorekeeping QR code, the same code Scorekeeper uses in the browser.
-2. A game link opens the game. A field link lists its games for the day; outside the game day it explains that games open for scorekeeping only on their game day, and shows the date. A field link stays on Home under _Field links_, so it reopens without the camera.
+2. A game link opens the game. A field link lists its games for the day; outside the game day it explains that games open for scorekeeping only on their game day, and shows the date. A field link, or a game link scanned before its game day, stays on Home under _Field links_, so it reopens without the camera. Each card names the teams and field of a game link, or the fields of a field link, with the start time of its first game.
 3. The game has four tabs:
    - **Rosters**: tap players to put them on the game roster. Team captain and Spirit captain show as `C` and `SC`.
    - **Live**: the score, the game clock, the Timekeeper and the actions. Tap a team's score to record a goal: tap the assist, then the scorer. _Callahan_ and _Unknown_ are above the player grid. Without rosters, tapping a score just counts the point.

@@ -395,7 +395,7 @@ export interface paths {
         };
         /**
          * List the games the scorekeeping link covers now
-         * @description Games of the link's event covered by the link right now, within the app token's scope. A link outside its game day returns an empty list and available_from, the date it starts working. The app token goes in the Authorization header only, never in the query string.
+         * @description Games of the link's event covered by the link right now, within the app token's scope. A link outside its game day returns an empty list, available_from, the date it starts working, and upcoming: the start time, field, location and, for a game link, the team names, so the app can name the link. upcoming is null when the list has games. The app token goes in the Authorization header only, never in the query string.
          */
         get: {
             parameters: {
@@ -445,7 +445,8 @@ export interface paths {
                          *             }
                          *           }
                          *         ],
-                         *         "available_from": null
+                         *         "available_from": null,
+                         *         "upcoming": null
                          *       }
                          *     }
                          */
