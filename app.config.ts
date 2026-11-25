@@ -9,7 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: isDev ? 'Ultiorganizer Scorekeeper (dev)' : 'Ultiorganizer Scorekeeper',
   slug: 'ultiorganizer-field',
   owner: 'ultiorganizer-team',
-  version: '0.2.0',
+  version: '0.2.1',
   orientation: 'default',
   icon: './assets/images/icon.png',
   // Not `ultiorganizer-app`: the setup QR is read by the in-app scanner only, and

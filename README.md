@@ -56,7 +56,7 @@ Pasting the setup link on the pairing screen needs the server's copyable setup l
 
 A link scanned before its game day is named by its teams, field and start time only when the server sends what the link covers (`upcoming` in the game list, on the server's master but not yet deployed). Until then such a card reads _Scorekeeping link_ with its date, and takes its game's name once it is opened on the game day.
 
-Version 0.2.0 is the current release, and everything above is in it. Still to come: iOS builds, a landscape layout, a screen reader pass with VoiceOver and TalkBack, a native speaker's review of the Finnish, German and Spanish strings, and store listings.
+Version 0.2.1 is the current release, and everything above is in it. Still to come: iOS builds, a landscape layout, a screen reader pass with VoiceOver and TalkBack, a native speaker's review of the Finnish, German and Spanish strings, and store listings.
 
 ## Documentation
 
